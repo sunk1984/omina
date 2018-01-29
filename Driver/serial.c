@@ -18,18 +18,18 @@ int ComInit(USART_CONFIG *pconfig)
 
 	switch(pconfig->usartport) {
 		case MRK_COMM_PORT:
-			fd=open("/dev/ttyUSBMeark", O_RDWR|O_NOCTTY|O_NDELAY);
+			fd=open("/dev/ttyUSB0", O_RDWR|O_NOCTTY|O_NDELAY);
 			break;
 		case DUT_COMM_PORT:
-			fd=open("/dev/ttyUSBDut", O_RDWR|O_NOCTTY|O_NDELAY);
+			fd=open("/dev/ttyUSB1", O_RDWR|O_NOCTTY|O_NDELAY);
 			break;
 		case GUI_COMM_PORT:
 			fd=open("/dev/ttyUSB2", O_RDWR|O_NOCTTY|O_NDELAY);
 			break;
-		case LED_COMM_PORT:
+		case CCP_COMM_PORT:
 			fd=open("/dev/ttyUSB3", O_RDWR|O_NOCTTY|O_NDELAY);
 			break;
-		case CCP_COMM_PORT:
+		case LED_COMM_PORT:
 			fd=open("/dev/ttyUSB4", O_RDWR|O_NOCTTY|O_NDELAY);
 			break;
 		default:
@@ -197,6 +197,7 @@ int UART_CheckStr(int fd, char *str, int second)
 		if (rxlen > 0) {
 			printf(rxtmp);
 			strcat(rxBuff, rxtmp);
+			memset(rxtmp, 0, 2048);
 
 		}
 		if (strstr(rxBuff, str) != NULL ) {
@@ -211,10 +212,10 @@ int UART_CheckStr(int fd, char *str, int second)
 
 int DUT_SendComman(char *cmd)
 {
-	char cmdBuff[48]={0};
+	char cmdBuff[512]={0};
 
 	tcflush(DUT_COMM_setting.fd, TCIOFLUSH);
-	sprintf(cmdBuff,"%s%s", cmd, "\n");
+	sprintf(cmdBuff,"%s%s", cmd, "\r");
 	printf(cmdBuff);
 	UART_SendFrame(DUT_COMM_setting.fd, cmdBuff, strlen(cmdBuff));
 
@@ -227,7 +228,18 @@ int DUT_GetCommandAck(char *Ack)
 
 	rxlen = read(DUT_COMM_setting.fd, Ack, 1024);
 
-	printf("read bytes: %d\n", rxlen);
+	printf("UUT read bytes: %d\n", rxlen);
+
+	return rxlen;
+}
+
+int UART_GetReceData(int fd, char *Ack)
+{
+	int rxlen=0;
+
+	rxlen = read(fd, Ack, 1024);
+
+	printf("CCP read bytes: %d\n", rxlen);
 
 	return rxlen;
 }

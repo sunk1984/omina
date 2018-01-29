@@ -137,10 +137,10 @@ static BOOL Audio_TestSimpTone(U16 exp_freq, U8 freq_tol, U16 amp_lower, U16 amp
     U16 rx_freq;     //
     U16 rx_amp;      //
 
-    delay_ms(2000);
-    for(i=0;i<5;i++)
+    delay_ms(1000);
+    for (i=0;i<10;i++)
     {
-    	delay_ms(500);
+    	delay_ms(300);
     	
         rx_freq = 0;
         rx_amp = 0;
@@ -156,38 +156,12 @@ static BOOL Audio_TestSimpTone(U16 exp_freq, U8 freq_tol, U16 amp_lower, U16 amp
                 break;
             }
         }
-        
-        /*if(rx_freq >= exp_freq)
-        {
-            if((rx_freq - exp_freq) > freq_tol)
-            {
-                ret = FAIL;  
-            }
-        }
-        if(rx_freq < exp_freq)
-        {
-            if((exp_freq - rx_freq) > freq_tol)
-            {
-                ret = FAIL;  
-            }
-        }
-        
-        if(rx_amp > amp_upper)
-        {
-            ret = FAIL;  
-        }
-        if(rx_amp < amp_lower)
-        {
-            ret = FAIL;  
-        }*/
     }
     //���һ��ûͨ����PassCount��Ϊ0,���ж�fail��ֻҪͨ��һ�����ж�pass
-    if(i == 5)
-    {
+    if (i >= 10) {
         ret = FAIL;
     }
-    else
-    {
+    else {
         ret = PASS;
     }
     return(ret);
@@ -311,9 +285,10 @@ BOOL Audio_DecToneFreq(U16 freq_lower, U16 freq_upper)
     return(FALSE);
 }
 
-BOOL Audio_WhiteNoiseTest(void)
+BOOL Audio_Test_WhiteNoise(U16 amp_lower, U16 amp_upper)
 {
-	return TRUE;
+	BOOL ret;
+	ret = Audio_TestSimpTone(9000, 10, amp_lower, amp_upper);
 }
 BOOL Audio_Open(void)
 {

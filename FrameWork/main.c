@@ -66,9 +66,8 @@ void Dprintf(char *lpszFormat, ...)
 
 int main(int argc, char *argv[])
 {
-//	InitDUTProb();
 	Modules_Config();
-	//Modules_Init();
+	Modules_Init();
 
 	//dbg();
 

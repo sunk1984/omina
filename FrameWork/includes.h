@@ -28,7 +28,9 @@
 #include "serial.h"
 #include "ADC.h"
 
+#include "test_led.h"
 #include "app.h"
+
 //#include "bcm2835.h"
 
 #endif//_INCLUDES_H_

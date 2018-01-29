@@ -25,11 +25,14 @@ char done_rpt[] = "\x10<DONE>\r\n";
 char ready_rpt[] = "\x10[READY]\r\n";
 
 typedef struct {
+	char head[48];
 	char board_name[48];
 	char board_version[48];
 	char software_version[48];
+	char date[48];
 	char MAC_address[48];
 	char serial_num[48];
+	char port[48];
 }EEPINFO;
 
 EEPINFO eepInfo;
@@ -38,12 +41,14 @@ EEPINFO eepInfo;
 #define ASSEMBLY_A002 2
 #define ASSEMBLY_A101 3
 
+#define DUT_ACK_BUFF_SIZE 512
+
 U8 assembly_type;
 int input_voltage=0;
 
 void GUI_SendMessage(char *lpszFormat, ...)
 {
-    U8 txBuff[100] = {0};
+    char txBuff[100] = {0};
     va_list fmtList;
 
     va_start( fmtList, lpszFormat );
@@ -51,8 +56,8 @@ void GUI_SendMessage(char *lpszFormat, ...)
     va_end( fmtList );
 
 	printf( (char *)txBuff);
-    LOGFILE_AddItem(txBuff);
-	UART_SendFrame(GUI_COMM_setting.fd, txBuff, strlen((char * )txBuff));
+    //LOGFILE_AddItem(txBuff);
+	UART_SendFrame(GUI_COMM_setting.fd, txBuff, strlen(txBuff));
 }
 
 void Modules_Config(void)
@@ -60,24 +65,28 @@ void Modules_Config(void)
     ComInit(&MRK_COMM_setting);	// fd:3
     ComInit(&GUI_COMM_setting);	// fd:4
 	ComInit(&DUT_COMM_setting);	// fd:5
-//  ComInit(&LED_COMM_setting);
+    ComInit(&LED_COMM_setting);
+    ComInit(&CCP_COMM_setting);
 
-    //RLY_SetCommonMode(1);   //Configure RLY board 1 to Common mode
-    //RLY_SetCommonMode(2);   //Configure RLY board 2 to Common mode
-    //RLY_SetCommonMode(3);   //Configure RLY board 3 to Common mode
+	RLY_SetAdMode(1);   //Configure RLY board 1 to Common mode
+	RLY_SetAdMode(2);   //Configure RLY board 2 to Common mode
+    RLY_SetCommonMode(3);   //Configure RLY board 3 to Common mode
 
     GUI_SendMessage("Fixture is ready\r\n");
 }
 
 void Modules_Init(void)
 {
+	int i;
     RLY_Clear(RELAY_BOARD_MAX);
+    for (i=1; i<18; i++) {
+    	EXTIO_ConfigureBitDirction(i, IO_INPUT);
+    }
+	//EXTIO_ConfigureByteDirction(1,  0xff);	//
+	//EXTIO_ConfigureByteDirction(9,  0xff);
+	//EXTIO_ConfigureByteDirction(17, 0xff);
 
-	EXTIO_ConfigureByteDirction(1, IO_INPUT);	//
-	EXTIO_ConfigureByteDirction(9, IO_INPUT);
-	EXTIO_ConfigureByteDirction(17, IO_INPUT);
-
-	PWR_TurnOffDut();
+	//PWR_TurnOffDut();
 }
 
 void ReportResult(U8 res)
@@ -114,8 +123,8 @@ void ReportResult(U8 res)
 #define VOLT_1V8_MAX	1880
 #define VOLT_1V8_MIN	1774
 
-#define CURR_TOT_MAX	450	/////////////////////////////
-#define CURR_TOT_MIN	100	/////////////////////////////
+#define CURR_TOT_MAX	350	/////////////////////////////
+#define CURR_TOT_MIN	10	/////////////////////////////
 
 #define CURR_SRC_45MAX	50
 #define CURR_SRC_45MIN	40
@@ -133,48 +142,54 @@ typedef struct {
 } VOLT_ITEM_T, *P_VOLT_ITEM_T;
 
 const VOLT_ITEM_T volt_item[] = {
-	"24V Measurement",       "MTP22", 22000, 26000, 2,
-	"3.3V Measurement",      "MTP11", 3250,  3350,  3,
-	"5.0V_PS Measurement",   "MTP12", 4750,  5250,  4,
-	"VDDARM_IN Measurement", "MTP5",  1227,  1270,  5,
-	"VDDSOC_IN Measurement", "MTP8",  1227,  1270,  6,
-	"1.5V Measurement",      "MTP21", 1470,  1530,  7,
-	"1.1V Measurement",      "MTP9",  1070,  1130,  8,
-	"1.8V  Measurement",     "MTP7",  1770,  1830,  9,
-	"5.0V Measurement",      "MTP13", 4750,  5250,  10,
-	"1.35V Measurement",     "MTP6",  1330,  1370,  11,	
-	"DDR_VTT Measurement",   "MTP27", 665,   685,   12,
-	"DDR_VREF Measurement",  "MTP26", 665,   685,   13,	
-//	"5.0V_USB Measurement",  "MTP14", 4750,  5250,  RLY_1V8C_VOLT,
-//	"7.5V Measurement",      "MTP10", 7250,  7750,  RLY_1V8X_VOLT,	
-};
-
-const VOLT_ITEM_T Impedance_item[] = {
-
-	"24V Measurement",       "MTP22", 200, 1000,  2,
-	"3.3V Measurement",      "MTP11", 200, 1000,  3,
-	"5.0V_PS Measurement",   "MTP12", 200, 1000,  4,
-	"VDDARM_IN Measurement", "MTP5",  200, 1000,  5,
-	"VDDSOC_IN Measurement", "MTP8",  200, 1000,  6,
-	"1.5V Measurement",      "MTP21", 200, 1000,  7,
-	"1.1V Measurement",      "MTP9",  200, 1000,  8,
-	"1.8V  Measurement",     "MTP7",  200, 1000,  9,
-	"5.0V Measurement",      "MTP13", 200, 1000,  10,
-	"1.35V Measurement",     "MTP6",  200, 1000,  11,
-	"DDR_VTT Measurement",   "MTP27", 200, 1000,  12,
-	"DDR_VREF Measurement",  "MTP26", 200, 1000,  13,
-	"5.0V_USB Measurement",  "MTP14", 200, 1000,  14,
-	"7.5V Measurement",      "MTP10", 200, 1000,  15,
+	{"24V Measurement",       "MTP22", 22000, 26000, 2},
+	{"3.3V Measurement",      "MTP11", 3250,  3350,  3},
+	{"5.0V_PS Measurement",   "MTP12", 4750,  5250,  4},
+	{"VDDARM_IN Measurement", "MTP5",  1227,  1270,  9},
+	{"VDDSOC_IN Measurement", "MTP8",  1227,  1270,  11},
+	{"1.5V Measurement",      "MTP21", 1470,  1530,  7},
+	{"1.1V Measurement",      "MTP9",  1070,  1130,  8},
+	{"1.8V  Measurement",     "MTP7",  1770,  1830,  5},
+	{"5.0V Measurement",      "MTP13", 4750,  5250,  10},
+	{"1.35V Measurement",     "MTP6",  1330,  1370,  6},
+	{"DDR_VTT Measurement",   "MTP27", 660,   685,   12},
+	{"DDR_VREF Measurement",  "MTP26", 665,   685,   13},
 };
 
 const VOLT_ITEM_T cvolt_item[] = {
-
 	{"5.0V_USB Measurement",  "MTP14", 4750,  5250,  14},
 	{"7.5V Measurement",      "MTP10", 7250,  7750,  15}
 };
 
+const VOLT_ITEM_T LED_volt_item[] = {
+	{"LED D7",  "", 30,  100,  18},
+	{"LED D8",  "", 30,  100,  21},
+	{"LED D17", "", 30,  100,  22},
+	{"LED D18", "", 30,  100,  23},
+	{"LED D19", "", 30,  100,  24},
+	{"LED D20", "", 30,  100,  40},
+};
+
+const VOLT_ITEM_T Impedance_item[] = {
+
+	{"24V Measurement",       "MTP22", 200, 2000,  2},
+	{"3.3V Measurement",      "MTP11", 200, 1000,  3},
+	{"5.0V_PS Measurement",   "MTP12", 200, 1000,  4},
+	{"VDDARM_IN Measurement", "MTP5",  200, 1000,  9},
+	{"VDDSOC_IN Measurement", "MTP8",  200, 1000,  11},
+	{"1.5V Measurement",      "MTP21", 200, 1000,  7},
+	{"1.1V Measurement",      "MTP9",  200, 1000,  8},
+	{"1.8V  Measurement",     "MTP7",  200, 1000,  5},
+	{"5.0V Measurement",      "MTP13", 200, 1000,  10},
+	{"1.35V Measurement",     "MTP6",  200, 1000,  6},
+	{"DDR_VTT Measurement",   "MTP27", 200, 1000,  12},
+	{"DDR_VREF Measurement",  "MTP26", 200, 1000,  13},
+	{"5.0V_USB Measurement",  "MTP14", 200, 1000,  14},
+	//{"7.5V Measurement",      "MTP10", 200, 1000,  15},
+};
+
 VOLT_ITEM_T Reset_item = {"Reset switch",  "MTP3", 0,  200,  16};
-VOLT_ITEM_T Battery_item = {"Battery",  "MTP28", 3200,  3500,  17};
+VOLT_ITEM_T Battery_item = {"Battery",  "MTP28", 3150,  3500,  17};
 
 int getVoltage(int channle)
 {
@@ -183,19 +198,15 @@ int getVoltage(int channle)
 	delay_ms(30);
 	ADC_GetVolt(&volt);
 	RLY_OFF(channle);
-
+	if (volt < 1500) {
+		volt=volt*99/100;
+	}
 	return volt;
 }
 
 static BOOL TestVoltages(P_VOLT_ITEM_T pitem)
 {
 	U32 volt;
-
-	//RLY_ON(pitem->channel);
-	//delay_ms(30);
-    //ADC_GetVolt(&volt);
-	//RLY_OFF(pitem->channel);
-	//delay_ms(30);
 
 	volt = getVoltage(pitem->channel);
 	GUI_SendMessage("%s\r\n%s:%2d.%03dV\r\n", pitem->title, pitem->tp_name, volt/1000, volt%1000);
@@ -206,64 +217,66 @@ static BOOL TestVoltages(P_VOLT_ITEM_T pitem)
 		return FAIL;
 }
 
-
-
 static U32 TestCurrent(U8 rly_bef_res, U8 rly_aft_res, int resis)
 {
 	U32 volt_former=0;
 	U32 volt_latter=0;
 	U32 volt_diff=0;
-	//U32 resis;  //resis range: 0.1 OHm to 99 OHm
 	U32 curr;
 
-    //RLY_ON(rly_bef_res);
-	//delay_ms(50);
-    //ADC_GetVolt(&volt_former);
-	//RLY_OFF(rly_bef_res);
 	volt_former=getVoltage(rly_bef_res);
 	Dprintf("former=%2d.%03dV\n", volt_former/1000, volt_former%1000);
 	delay_ms(50);
 
-	//RLY_ON(rly_aft_res);
-	//delay_ms(50);
-    //ADC_GetVolt(&volt_latter);
-	//RLY_OFF(rly_aft_res);
-	volt_latter=getVoltage(volt_latter);
+	volt_latter=getVoltage(rly_aft_res);
 	Dprintf("latter=%2d.%03dV\n", volt_latter/1000, volt_latter%1000);
 
-    //resis = 1; // resis = 5 Ohm
     Dprintf("res=%d Ohm\n", resis);
 
     volt_diff = volt_former - volt_latter;
     curr = volt_diff/resis;
-    GUI_SendMessage("%2d.%03dA\r\n", curr/1000, curr%1000);
+    //GUI_SendMessage("%2d.%03dA\r\n", curr/1000, curr%1000);
+    GUI_SendMessage("%dmA\r\n", curr);
 
 	return curr;
 }
-
-
 
 int parseProgrammingParameter(char *cmd)
 {
 	char *pStr;
 	char *line;
+	//int index=0;
 
 	pStr=cmd;
 	while( (line=strtok(pStr, " ")) != NULL) {
-		if (strstr(line, "a=")) {
+		switch(*line) {
+		case 'i':
+			strcpy(eepInfo.head, (line+2));
+			break;
+		case 'a':
 			strcpy(eepInfo.board_name, (line+2));
-		}
-		if (strstr(line, "b=")) {
+			break;
+		case 'b':
 			strcpy(eepInfo.board_version, (line+2));
-		}
-		if (strstr(line, "v=")) {
+			break;
+		case 'v':
 			strcpy(eepInfo.software_version, (line+2));
-		}
-		if (strstr(line, "X=")) {
-			strcpy(eepInfo.MAC_address, (line+2));
-		}
-		if (strstr(line, "n=")) {
+			break;
+		case 'n':
 			strcpy(eepInfo.serial_num, (line+2));
+			break;
+		case 'p':
+			strcpy(eepInfo.port, (line+2));
+			break;
+		case 'd':
+			strcpy(eepInfo.date, (line+2));
+			break;
+		default:
+			if ((*line >= '0') && (*line <= '7') ) {
+				strcpy(eepInfo.MAC_address, line);
+				eepInfo.MAC_address[1]=' ';
+			}
+			break;
 		}
 		pStr += strlen(line)+1;
 	}
@@ -271,38 +284,351 @@ int parseProgrammingParameter(char *cmd)
 }
 
 
-static BOOL RS232_loop_test(void)
+static BOOL Currentloop_Active_test1(void)
 {
-	volatile U8 timeout=0;
-    U32 rcnt=0;
-    char rbuf[500];
-    char tx_str[255];
-    const char test_str[] = "The quick brown fox jumps over the lazy dog";
+	char tx_cmd[] = "echo \"the quick brown fox jumps over the lazy dog 0123456789\" > /dev/ttymxc4";
+    char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
 
-	read(DUT_COMM_setting.fd, rbuf, 500);
-
-	sprintf(tx_str, "%s\r", test_str);
-	UART_SendFrame(DUT_COMM_setting.fd, (U8 *)tx_str, strlen((char * )tx_str));
-	printf("Put: \"%s\" ", test_str);
-
-    while(1) {
-		if(timeout++ > 200)
-			break;
-
-		if(UART_GetLine(DUT_COMM_setting.fd, (U8 * )rbuf, (U8 * )&rcnt)) {
-			printf("Got \"%s\" \n", test_str);
-			if(strstr((char *)rbuf, (char * )test_str)) {
-				printf("loop ok\n");
-				delay_ms(20);
-				return TRUE;
-			}
-		}
-		delay_ms(1);
+    tcflush(CCP_COMM_setting.fd, TCIOFLUSH);
+    //DUT send test string
+    DUT_SendComman(tx_cmd);
+    //CCP receive test string
+    if (UART_CheckStr(CCP_COMM_setting.fd, test_str, 1)) {
+    	GUI_SendMessage("Pass\r\n");
+    	return PASS;
     }
-
-	return FALSE;
+    else {
+    	GUI_SendMessage("Fail\r\n");
+    	return FAIL;
+    }
 }
 
+static BOOL Currentloop_Active_test2(void)
+{
+	char tx_cmd[] = "cat < /dev/ttymxc4 &";
+	char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
+	char send_str[100]={0};
+	char buff[1024]={0};
+	char cmd[10]={0};
+	int i=0;
+	int ret;
+
+	sprintf(send_str,"%s%s", test_str, "\r");
+	DUT_SendComman("cat < /dev/ttymxc4 &");
+	//CCP send test string
+	tcflush(CCP_COMM_setting.fd, TCIOFLUSH);
+	delay_ms(100);
+
+	/*for (i=0; i<3; i++) {
+		UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+		if (UART_CheckStr(DUT_COMM_setting.fd, test_str, 1)) {
+				GUI_SendMessage("Pass\r\n");
+				return PASS;
+			}
+	}
+
+	GUI_SendMessage("Fail\r\n");
+	return FAIL;*/
+	for (i=0; i<3; i++) {
+		UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+		if (UART_CheckStr(DUT_COMM_setting.fd, test_str, 1)) {
+				//GUI_SendMessage("Pass\r\n");
+				//return PASS;
+				break;
+			}
+	}
+	if (i >= 3) {
+		ret = FAIL;
+	}
+	else {
+		ret = PASS;
+	}
+
+	DUT_SendComman("fg");
+	delay_ms(10);
+	cmd[0]=0x03;//ctrl+c
+	DUT_SendComman(cmd);
+	delay_ms(10);
+	return ret;
+}
+
+static BOOL Currentloop_Active_test3(void)
+{
+	char tx_cmd[] = "echo \"the quick brown fox jumps over the lazy dog 0123456789\" > /dev/ttyS1";
+    char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
+
+    tcflush(CCP_COMM_setting.fd, TCIOFLUSH);
+    //DUT send test string
+    DUT_SendComman("echo \"the quick brown fox jumps over the lazy dog 0123456789\" > /dev/ttyS1");
+    //CCP receive test string
+    if (UART_CheckStr(CCP_COMM_setting.fd, test_str, 1)) {
+    	GUI_SendMessage("Pass\r\n");
+    	return PASS;
+    }
+    else {
+    	GUI_SendMessage("Fail\r\n");
+    	return FAIL;
+    }
+}
+
+static BOOL Currentloop_Active_test4(void)
+{
+    char tx_cmd[] = "cat < /dev/ttyS1 &";
+    char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
+	char send_str[100]={0};
+	char buff[1024]={0};
+	char cmd[10]={0};
+	int ret;
+	int i=0;
+
+	sprintf(send_str,"%s%s", test_str, "\r");
+	DUT_SendComman("cat < /dev/ttyS1 &");
+	//CCP send test string
+	tcflush(CCP_COMM_setting.fd, TCIOFLUSH);
+	delay_ms(100);
+	//UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+	//DUT receive test string
+	/*for (i=0; i<3; i++) {
+		UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+		if (UART_CheckStr(DUT_COMM_setting.fd, test_str, 1)) {
+				GUI_SendMessage("Pass\r\n");
+				return PASS;
+			}
+	}
+
+	GUI_SendMessage("Fail\r\n");
+	return FAIL;*/
+
+	for (i=0; i<3; i++) {
+		UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+		if (UART_CheckStr(DUT_COMM_setting.fd, test_str, 1)) {
+				//GUI_SendMessage("Pass\r\n");
+				//return PASS;
+				break;
+			}
+	}
+	if (i >= 3) {
+		ret = FAIL;
+	}
+	else {
+		ret = PASS;
+	}
+
+	DUT_SendComman("fg");
+	delay_ms(10);
+	cmd[0]=0x03;//ctrl+c
+	DUT_SendComman(cmd);
+	delay_ms(10);
+	return ret;
+}
+
+static BOOL Currentloop_Active_test5(void)
+{
+	char tx_cmd[] = "echo \"the quick brown fox jumps over the lazy dog 0123456789\" > /dev/ttyS0";
+    char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
+    int ret;
+    int i;
+    tcflush(CCP_COMM_setting.fd, TCIOFLUSH);
+
+    //DUT send test string
+    /*DUT_SendComman("echo \"the quick brown fox jumps over the lazy dog 0123456789\" > /dev/ttyS0");
+    //CCP receive test string
+    if (UART_CheckStr(CCP_COMM_setting.fd, test_str, 1)) {
+    	GUI_SendMessage("Pass\r\n");
+    	return PASS;
+    }
+    else {
+    	GUI_SendMessage("Fail\r\n");
+    	return FAIL;
+    }*/
+
+    for (i=0; i<3; i++) {
+    	//DUT send test string
+    	   DUT_SendComman("echo \"the quick brown fox jumps over the lazy dog 0123456789\" > /dev/ttyS0");
+    	   if (UART_CheckStr(CCP_COMM_setting.fd, test_str, 1)) {
+    	       	break;
+    	      }
+    }
+    if (i>=3) {
+    	ret = FAIL;
+    }
+    else {
+    	ret =PASS;
+    }
+    return ret;
+
+}
+
+static BOOL Currentloop_Active_test6(void)
+{
+	char tx_cmd[] = "cat < /dev/ttyS0 &";
+	char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
+	char send_str[100]={0};
+	char cmd[10]={0};
+	int ret;
+	int i=0;
+
+	sprintf(send_str,"%s%s", test_str, "\r");
+	DUT_SendComman("cat < /dev/ttyS0 &");
+	//CCP send test string
+	tcflush(CCP_COMM_setting.fd, TCIOFLUSH);
+	delay_ms(100);
+	//UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+	//DUT receive test string
+	/*for (i=0; i<3; i++) {
+		UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+		if (UART_CheckStr(DUT_COMM_setting.fd, test_str, 1)) {
+				GUI_SendMessage("Pass\r\n");
+				return PASS;
+			}
+	}
+
+	GUI_SendMessage("Fail\r\n");
+	return FAIL;*/
+
+	for (i=0; i<3; i++) {
+		UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+		if (UART_CheckStr(DUT_COMM_setting.fd, test_str, 1)) {
+				//GUI_SendMessage("Pass\r\n");
+				//return PASS;
+				break;
+			}
+	}
+	if (i >= 3) {
+		ret = FAIL;
+	}
+	else {
+		ret = PASS;
+	}
+
+	DUT_SendComman("fg");
+	delay_ms(10);
+	cmd[0]=0x03;//ctrl+c
+	DUT_SendComman(cmd);
+	delay_ms(10);
+	return ret;
+
+}
+
+static BOOL Currentloop_Active_test7(void)
+{
+	char rbuf[1024]={0};
+    const char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
+    int ret;
+    char cmd[10]={0};
+
+    DUT_SendComman("cat < /dev/ttyS0 &");
+    //DUT_GetCommandAck(rbuf);
+    DUT_SendComman("echo \"the quick brown fox jumps over the lazy dog 0123456789\" > /dev/ttyS1");
+    delay_ms(200);
+    DUT_GetCommandAck(rbuf);
+    if (strstr(rbuf, test_str)) {
+    	//GUI_SendMessage("Pass\r\n");
+    	//return PASS;
+    	ret = PASS;
+    }
+    else {
+    	//GUI_SendMessage("Fail\r\n");
+    	//return FAIL;
+    	ret = FAIL;
+    }
+    DUT_SendComman("fg");
+	delay_ms(10);
+	cmd[0]=0x03;//ctrl+c
+	DUT_SendComman(cmd);
+	delay_ms(10);
+	return ret;
+}
+
+static BOOL Currentloop_Passive_test1(void)
+{
+	char Dutrbuf[1024]={0};
+	char ccprbuf[1024]={0};
+    const char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
+    char send_str[100]={0};
+    int DutRecvlen=0;
+    int i=0;
+    int ret=FAIL;
+    char *str;
+
+    sprintf(send_str,"%s%s", test_str, "\r");
+    DUT_SendComman("cat < /dev/ttyS1 &");
+    tcflush(CCP_COMM_setting.fd, TCIOFLUSH);
+    delay_ms(100);
+    DUT_GetCommandAck(Dutrbuf); //clear dut buffer
+    UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+    delay_ms(200);
+    DutRecvlen=DUT_GetCommandAck(Dutrbuf);
+
+	for (i=0; i<DutRecvlen; i++)  {
+		if (Dutrbuf[i] != 0) {
+			str = Dutrbuf+i;
+			if (strstr(str, test_str)) {
+				ret = PASS;
+				break;
+			}
+		}
+	}
+
+    if (ret == FAIL) {
+    	return FAIL;
+    }
+    UART_GetReceData(CCP_COMM_setting.fd, ccprbuf);
+    if (strstr(ccprbuf, test_str) == NULL) {
+		GUI_SendMessage("Fail\r\n");
+		return FAIL;
+    }
+    else {
+    	GUI_SendMessage("Pass\r\n");
+    	return PASS;
+    }
+}
+
+static BOOL Currentloop_Passive_test2(void)
+{
+	char Dutrbuf[1024]={0};
+	char ccprbuf[1024]={0};
+	const char test_str[] = "the quick brown fox jumps over the lazy dog 0123456789";
+	char send_str[100]={0};
+	int DutRecvlen=0;
+	int i=0;
+	int ret=FAIL;
+	char *str;
+
+	sprintf(send_str,"%s%s", test_str, "\r");
+	DUT_SendComman("cat < /dev/ttyS0 &");
+	tcflush(CCP_COMM_setting.fd, TCIOFLUSH);
+	delay_ms(100);
+	DUT_GetCommandAck(Dutrbuf); //clear dut buffer
+	UART_SendFrame(CCP_COMM_setting.fd, send_str, strlen(send_str));
+	delay_ms(200);
+	DutRecvlen=DUT_GetCommandAck(Dutrbuf);
+	for (i=0; i<DutRecvlen; i++)  {
+		if (Dutrbuf[i] != 0) {
+			str = Dutrbuf+i;
+			if (strstr(str, test_str)) {
+				ret = PASS;
+				break;
+			}
+		}
+	}
+
+
+	if (ret == FAIL) {
+		return FAIL;
+	}
+	UART_GetReceData(CCP_COMM_setting.fd, ccprbuf);
+	if (strstr(ccprbuf, test_str) == NULL) {
+		GUI_SendMessage("Fail\r\n");
+		return FAIL;
+	}
+	else {
+		GUI_SendMessage("Pass\r\n");
+		return PASS;
+	}
+}
+
+typedef BOOL (*CURRLOOP_FUNC)(void);
 typedef struct {
 	U8 name[80];
 
@@ -313,132 +639,65 @@ typedef struct {
 	U32 rly_out_1;
 	U32 rly_out_2;
 	U32 rs232_rlyout;
+	CURRLOOP_FUNC Currentloop_Test;
 
 } CURRLOOP_ITEM_T, *P_CURRLOOP_ITEM_T;
 
-const CURRLOOP_ITEM_T currloop_item[] = {
+const CURRLOOP_ITEM_T Activecurrloop_item[] = {
 
 	// Group 1
 	// Current Loop 1
 	"from UART5 to CRIND(P300-1,3)",
 	RLY_LP_DUT_P300_1_FCT_P303_2, RLY_LP_DUT_P300_3_FCT_P303_1, RLY_FCT_P302B4_RS232OUT,
-	RLY_DUMMY, 					RLY_DUMMY, 					RLY_DUT_P302A1_RS232IN,
+	RLY_DUMMY, 					RLY_DUMMY, 					RLY_FCT_P302B5_RS232IN,
+	Currentloop_Active_test1,
 
 	"from CRIND(P300-1,3 to UART5)",
 	RLY_LP_DUT_P300_1_FCT_P303_2, RLY_LP_DUT_P300_3_FCT_P303_1, RLY_FCT_P302B4_RS232OUT,
-	RLY_DUMMY, 					RLY_DUMMY, 					RLY_DUT_P302B1_RS232IN,
+	RLY_DUMMY, 					RLY_DUMMY, 					RLY_FCT_P302B5_RS232IN,
+	Currentloop_Active_test2,
 
 	// Current Loop 2
 	"from UART6 to Pump(P300-4,5)",
 	RLY_LP_DUT_P300_4_FCT_P303_2, RLY_LP_DUT_P300_5_FCT_P303_1, RLY_FCT_P302B4_RS232OUT,
-	RLY_DUT_LOAD_10R_IN_PUMP, 	RLY_DUMMY, 					RLY_DUT_P302A5_RS232IN,
+	RLY_DUMMY, 	                  RLY_DUMMY, 					RLY_FCT_P302B5_RS232IN,
+	Currentloop_Active_test3,
 
 	"from Pump(P300-4,5) to UART6",
 	RLY_LP_DUT_P300_4_FCT_P303_2, RLY_LP_DUT_P300_5_FCT_P303_1, RLY_FCT_P302B4_RS232OUT,
-	RLY_DUT_LOAD_10R_IN_PUMP, 	RLY_DUMMY, 					RLY_DUT_P302B5_RS232IN,
+	RLY_DUMMY, 	                  RLY_DUMMY, 					RLY_FCT_P302B5_RS232IN,
+	Currentloop_Active_test4,
 
-	// Current Loop 3
+	 //Current Loop 3
 	"from UART7 to PUMP(P303)",
-	RLY_LP_DUT_P333_3_FCT_P303_2,  RLY_LP_DUT_P333_4_FCT_P303_1, RLY_FCT_P302B4_RS232OUT,
-	RLY_DUT_LOAD_10R_IN_PUMP, 	RLY_DUMMY, 					RLY_DUT_P302A5_RS232IN,
+	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
+	RLY_DUMMY, 	                  RLY_DUMMY, 					RLY_FCT_P302B1_RS232IN,
+	Currentloop_Active_test5,
 
-	"from to UART7",
-	RLY_LP_DUT_P333_3_FCT_P303_2,  RLY_LP_DUT_P333_4_FCT_P303_1, RLY_FCT_P302B4_RS232OUT,
-	RLY_DUT_LOAD_10R_IN_PUMP, 	RLY_DUMMY, 					RLY_DUT_P302B5_RS232IN,
+	"from PUMP(P303) to UART7",
+	RLY_LP_DUT_P303_1_FCT_P300_5,  RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
+	RLY_DUMMY, 	                   RLY_DUMMY, 					 RLY_FCT_P302B1_RS232IN,
+	Currentloop_Active_test6,
 
 	// Current Loop 4
 	"from Pump(P300-4,5) to PUMP(P303)",
-	RLY_LP_DUT_P333_3_FCT_P303_2,  RLY_LP_DUT_P333_4_FCT_P303_1, RLY_FCT_P302B4_RS232OUT,
-	RLY_DUT_LOAD_10R_IN_PUMP, 	RLY_DUMMY, 					RLY_DUT_P302B5_RS232IN,
-
-	// Group 2
-	"No jump on J4, from P302A-2 to P300-1&3",
-	RLY_DUMMY, 					RLY_DUMMY, 					RLY_DUT_P302A2_RS232OUT,
-	RLY_LP_DUT_P300_1_FCT_P303_2, RLY_LP_DUT_P300_3_FCT_P303_1, RLY_FCT_P302B5_RS232IN,
-
-	"No jump on J4, from P302B-2 to P300-1&3",
-	RLY_DUMMY, 					RLY_DUMMY,					RLY_DUT_P302B2_RS232OUT,
-	RLY_LP_DUT_P300_1_FCT_P303_2, RLY_LP_DUT_P300_3_FCT_P303_1, RLY_FCT_P302B5_RS232IN,
-
-	// Current Loop 5
-	"No jump on J4, from P303-1&2 to P300-4&5",
-	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
-	RLY_LP_DUT_P300_4_FCT_P303_2, RLY_LP_DUT_P300_5_FCT_P303_1, RLY_FCT_P302B5_RS232IN,
-
-	// Current Loop 6
-	"No jump on J4, from P303-1&2 to P333-3&4",
-	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
-	RLY_LP_DUT_P333_3_FCT_P303_2, RLY_LP_DUT_P333_4_FCT_P303_1, RLY_FCT_P302B5_RS232IN,
-
-	// Current Loop 7
-	"No jump on J4, from P303-1&2 to P302A-5",
-	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
-	RLY_DUMMY, 					RLY_DUMMY,					RLY_DUT_P302A5_RS232IN,
-
-	"No jump on J4, from P303-1&2 to P302B-5",
-	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
-	RLY_DUMMY, 					RLY_DUMMY, 					RLY_DUT_P302B5_RS232IN,
-
-	// Current Loop 8
-	"Jump on J4, from P300-1&3 to P302A-1",
-	RLY_LP_DUT_P300_4_FCT_P303_2, RLY_LP_DUT_P300_5_FCT_P303_1, RLY_FCT_P302B2_RS232OUT,
-	RLY_JUMPER_J4_MODE, 			RLY_DUMMY, 					RLY_DUT_P302A1_RS232IN,
-
-	"Jump on J4, from P300-1&3 to P302B-1",
-	RLY_LP_DUT_P300_4_FCT_P303_2, RLY_LP_DUT_P300_5_FCT_P303_1, RLY_FCT_P302B2_RS232OUT,
-	RLY_JUMPER_J4_MODE, 			RLY_DUMMY, 					RLY_DUT_P302B1_RS232IN,
-
-	// Current Loop 9
-	"Jump on J4, from P303-1&2 to P302A-5",
-	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
-	RLY_JUMPER_J4_MODE, 			RLY_DUT_A_SIDE_LINK,			RLY_DUT_P302A5_RS232IN,
-
-	"Jump on J4, from P303-1&2 to P302B-5",
-	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
-	RLY_JUMPER_J4_MODE, 			RLY_DUT_B_SIDE_LINK, 		RLY_DUT_P302B5_RS232IN,
-
-	// Current Loop 10
-	"Jump on J4, from P302A-4 to P303-1&2",
-	RLY_JUMPER_J4_MODE, 			RLY_DUMMY, 					RLY_DUT_P302A4_RS232OUT,
-	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B1_RS232IN,
-
-	"Jump on J4, from P302B-4 to P303-1&2",
-	RLY_JUMPER_J4_MODE, 			RLY_DUMMY, 					RLY_DUT_P302B4_RS232OUT,
-	RLY_LP_DUT_P303_1_FCT_P300_5, RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B1_RS232IN,
+	RLY_LP_DUT_P300_4_DUT_P303_2,  RLY_LP_DUT_P300_5_DUT_P303_1, RLY_DUMMY,
+	RLY_DUMMY, 	                   RLY_DUMMY, 					 RLY_DUMMY,
+	Currentloop_Active_test7,
 };
 
-typedef struct {
-	U8 name[80];
+const CURRLOOP_ITEM_T Passive_currloop_item[] = {
+		// Current Loop 5
+   "from Pump(P300-4,5) to PUMP(P303)",
+	RLY_LP_DUT_P300_4_FCT_P303_2,  RLY_LP_DUT_P300_5_FCT_P303_1, RLY_FCT_P302B4_RS232OUT,
+	RLY_LP_DUT_P303_1_FCT_P300_5,  RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B1_RS232IN,
+	Currentloop_Passive_test1,
 
-	U32 rly_in_1;
-	U32 rly_in_2;
-	U32 rs232_rlyin;
-
-	U32 rly_out_1;
-	U32 rly_out_2;
-	U32 rs232_rlyout;
-
-	U8 type;
-	U8 io_ch;
-
-} CPLD_TRUTH_TABLE_ITEM_T, *P_CPLD_TRUTH_TABLE_ITEM_T;
-
-#define CPLD_TYPE_COMMON	0
-#define CPLD_TYPE_IS_1		1
-#define CPLD_TYPE_MODE		2
-#define CPLD_TYPE_GSOM_PUMP	 3
-
-#define PUMP_TO_GSOM_A		0
-#define PUMP_TO_GSOM_B	 	1
-
-const CPLD_TRUTH_TABLE_ITEM_T CPLD_truth_table[] = {
-
+	"from Pump(P300-4,5) to PUMP(P303)",
+	RLY_LP_DUT_P300_4_FCT_P303_2,  RLY_LP_DUT_P300_5_FCT_P303_1, RLY_FCT_P302B5_RS232IN,
+	RLY_LP_DUT_P303_1_FCT_P300_5,  RLY_LP_DUT_P303_2_FCT_P300_4, RLY_FCT_P302B2_RS232OUT,
+	Currentloop_Passive_test2,
 };
-
-static BOOL RS232_CPLD_cts_test(U8 io_bit)
-{
-	return TRUE;
-}
 
 static BOOL TestCurrLoopItem(P_CURRLOOP_ITEM_T currloop)
 {
@@ -453,8 +712,9 @@ static BOOL TestCurrLoopItem(P_CURRLOOP_ITEM_T currloop)
 	RLY_ON(currloop->rly_out_1);
 	RLY_ON(currloop->rly_out_2);
 	RLY_ON(currloop->rs232_rlyin);
+	delay_ms(100);
 
-	test_result = RS232_loop_test();
+	test_result = currloop->Currentloop_Test();
 
 	RLY_OFF(currloop->rly_in_1);
 	RLY_OFF(currloop->rly_in_2);
@@ -464,60 +724,15 @@ static BOOL TestCurrLoopItem(P_CURRLOOP_ITEM_T currloop)
 	RLY_OFF(currloop->rly_out_2);
 	RLY_OFF(currloop->rs232_rlyin);
 
+	if (test_result == PASS) {
+		GUI_SendMessage("Passed\r\n");
+	}
+	else {
+		GUI_SendMessage("Failed\r\n");
+	}
+
 	return test_result;
 }
-
-
-
-#define IO_READ_TIMES	10
-
-static BOOL GetHighLevel(U8 iob_ch)
-{
-	U8 i;
-    U8 readBit = 0;
-
-	EXTIO_ConfigureBitDirction(iob_ch, IO_INPUT);
-
-	for(i=0; i<IO_READ_TIMES; i++) {
-		EXTIO_ReadBit(iob_ch, &readBit);
-		delay_ms(20);
-		if(readBit == 0)
-			break;
-	}
-	if(i == IO_READ_TIMES)
-		return TRUE;
-	else
-		return FALSE;
-}
-
-#define IOB_ETHMUX_START		1
-
-void Set_EtherMuxIO(U8 port_src, U8 port_dest)
-{
-	U32 oe_data;	// OE, bit 0,2,4,6,8..., 20, 22
-	U32 sw_data;	// SW, bit 1,3,5,7,9..., 21, 23
-	U32 out_data;	// 24 bits
-
-	oe_data = (1 << (port_src<<1)) | (1 << (port_dest<<1));
-	oe_data = ~oe_data;
-
-	sw_data = 1 << ((port_src<<1)+1);
-	sw_data = ~sw_data;
-
-	out_data = (oe_data & sw_data)&0xFFFFFF;
-
-//    EXTIO_ConfigureByteDirction(IOB_ETHMUX_START+16, IO_OUTPUT);
-//    EXTIO_ConfigureByteDirction(IOB_ETHMUX_START+8, IO_OUTPUT);
-//	EXTIO_ConfigureByteDirction(IOB_ETHMUX_START, IO_OUTPUT);
-
-//    EXTIO_WriteByte(IOB_ETHMUX_START+16, (U8)(out_data>>16));
-	printf("IOB h :%02x\n", (U8)(out_data>>16));
-//    EXTIO_WriteByte(IOB_ETHMUX_START+8, (U8)(out_data>>8));
-	printf("IOB m :%02x\n", (U8)(out_data>>8));
-//    EXTIO_WriteByte(IOB_ETHMUX_START, (U8)(out_data));
-	printf("IOB l :%02x\n", (U8)(out_data));
-}
-
 
 
 void PowerCycle(void)
@@ -528,46 +743,20 @@ void PowerCycle(void)
 	delay_ms(200);
 }
 
-
-#define LEVEL_HIGH	1
-#define LEVEL_LOW	0
-
-static BOOL Test_SerialPort(U8 rly_loop, U8 rly_in, U8 rly_out)
-{
-    U8 res;
-
-	RLY_ON(rly_loop);
-	RLY_ON(rly_in);
-	RLY_ON(rly_out);
-
-	res = RS232_loop_test();
-
-	RLY_OFF(rly_loop);
-	RLY_OFF(rly_in);
-	RLY_OFF(rly_out);
-
-	if(res == TRUE)
-		GUI_SendMessage("Passed\r\n");
-	else
-		GUI_SendMessage("Failed\r\n");
-
-	return res;
-}
-U8 board_version = 0x0F;
-
-
 void TestItem_Impedance(U8 * test_result)
 {
 	U8 i;
 	U8 res;
+	int test_num=0;
 
 	*test_result = PASS;
+	test_num = sizeof(Impedance_item)/sizeof(VOLT_ITEM_T);
 
-	for (i=0; i<sizeof(Impedance_item)/sizeof(VOLT_ITEM_T); i++) {
-		RLY_ON(26+i);
-		delay_ms(50);
+	for (i=0; i<test_num; i++) {
+		RLY_ON(24+Impedance_item[i].channel);
+		delay_ms(100);
 		res = TestVoltages((P_VOLT_ITEM_T)&Impedance_item[i]);
-		RLY_OFF(26+i);
+		RLY_OFF(24+Impedance_item[i].channel);
 
 		if(res == PASS)
 			GUI_SendMessage("Passed\r\n");
@@ -583,40 +772,49 @@ void TestItem_PowerOn(U8 * test_result)
 	U32 curr;
 
 	Modules_Init();
+	RLY_ON(RLY_DUT_DEBUG_TX);
+	RLY_ON(RLY_DUT_DEBUG_RX);
 	PWR_TurnOnDut();
-	delay_ms(100);
-    GUI_SendMessage("Test Current\r\n");
-	curr = TestCurrent(1, 2, 1);
+	delay_ms(1000);
 
+    GUI_SendMessage("Test Current\r\n");
+
+	curr = TestCurrent(RLY_24V_PPS, RLY_24V_INPUT, 1);
 	if(curr >= CURR_TOT_MIN && curr <= CURR_TOT_MAX) {
 		* test_result = PASS;
 	}
 	else
 		* test_result = FAIL;
+
+
 }
 
 void TestItem_Voltage(U8 * test_result)
 {
     U8 i;
     U8 res;
+    int test_num=0;
 
-    * test_result = PASS;
+    *test_result = PASS;
+    test_num = sizeof(volt_item)/sizeof(VOLT_ITEM_T);
 
-    for(i=0; i<sizeof(volt_item)/sizeof(VOLT_ITEM_T); i++) {
+    for(i=0; i<test_num; i++) {
     	res = TestVoltages((P_VOLT_ITEM_T)&volt_item[i]);
 		if(res == PASS)
 			GUI_SendMessage("Passed\r\n");
 		else
 			GUI_SendMessage("Failed\r\n");
 
-		* test_result &= res;
+		*test_result &= res;
     }
 }
 
 void TestItem_Reset(U8 * test_result)
 {
 	int i;
+
 	*test_result = FAIL;
+	GUI_SendMessage("Start to test reset switch\r\n");
 
 	for (i=0; i<100; i++) {
 		if (TestVoltages(&Reset_item)) {
@@ -626,24 +824,35 @@ void TestItem_Reset(U8 * test_result)
 		delay_ms(100);
 	}
 
-	if(*test_result == PASS)
-		GUI_SendMessage("Passed\r\n");
-	else
+	if (*test_result == FAIL) {
 		GUI_SendMessage("Failed\r\n");
+		return;
+	}
+	else {
+		GUI_SendMessage("Passed\r\n");
+	}
+
+	*test_result = Test_ResetLED();
+	if (*test_result == PASS) {
+		GUI_SendMessage("PASS\r\n");
+	}
+	else {
+		GUI_SendMessage("FAIL\r\n");
+	}
 }
 
 void TestItem_Battery(U8 * test_result)
 {
 	*test_result = FAIL;
 
-	RLY_ON(71);
+	RLY_ON(RLY_BATTERY_SWITCH);
 	delay_ms(30);
 
 	if (TestVoltages(&Battery_item)) {
 		*test_result = PASS;
 	}
 
-	RLY_OFF(71);
+	RLY_OFF(RLY_BATTERY_SWITCH);
 	delay_ms(30);
 
 	if(*test_result == PASS)
@@ -654,91 +863,164 @@ void TestItem_Battery(U8 * test_result)
 
 void TestItem_UBoot(U8 * test_result)
 {
-	/*int i;
-	char BootConfig[3]={0};
+	//int i;
+	U8 BootConfig[3]={0};
 
-	 *test_result=FAIL;
-	 for (i=0; i<3; i++) {
-		 EXTIO_ReadByte(1+8*i, BootConfig+i);
-	 }
-	 BootConfig[0] &= 0xff;
-	 BootConfig[1] &= 0xff;
-	 BootConfig[2] &= 0x01;
+	GUI_SendMessage("Start to test Boot config\r\n");
 
-	 if ((BootConfig[0]==0x20) && (BootConfig[1]==0x20) && BootConfig[2]==0x01) {
-		 //*test_result = PASS;
-		 //GUI_SendMessage("Passed\r\n");
-	 }
-	 else {
-		 *test_result = FAIL;
-		 //GUI_SendMessage("Failed\r\n");
-	 }
-	 RLY_ON(49);
-	 RLY_ON(50);
-	 tcflush(DUT_COMM_setting.fd, TCIFLUSH);
-	 PowerCycle();*/
+	RLY_ON(RLY_RESET); //reset the board
+	delay_ms(500);
 
-		 UART_SendFrame(DUT_COMM_setting.fd, "\r", sizeof("\r"));
-		 *test_result = PASS;
-	 //}
-	 *test_result = FAIL;
+	EXTIO_ReadByte(1,  &BootConfig[0]);
+	EXTIO_ReadByte(9,  &BootConfig[1]);
+	EXTIO_ReadByte(17, &BootConfig[2]);
+
+	BootConfig[0] &= 0xff;
+	BootConfig[1] &= 0xff;
+	BootConfig[2] &= 0x01;
+
+	if ((BootConfig[0]==0x40) && (BootConfig[1]==0x20) && (BootConfig[2]==0x00)) {
+		GUI_SendMessage("U-Boot Config passed\r\n");
+	}
+	else {
+		GUI_SendMessage("U-Boot Config failed\r\n");
+		*test_result = FAIL;
+		return;
+	}
+
+	tcflush(DUT_COMM_setting.fd, TCIFLUSH);
+	GUI_SendMessage("U-Boot starts\r\n");
+	RLY_OFF(RLY_RESET);
+
+	if (UART_CheckStr(DUT_COMM_setting.fd, "autoboot:", 2)) {
+		UART_SendFrame(DUT_COMM_setting.fd, "\r", strlen("\r"));
+		GUI_SendMessage("at the U-Boot prompt \r\n");
+		*test_result = PASS;
+	}
+	else {
+		GUI_SendMessage("Failed\r\n");
+		*test_result = FAIL;
+	}
 }
 
 void TestItem_Program(U8 *test_result)
 {
 	char cmdBuff[100]={0};
+	char AckBuff[1024]={0};
+	char verisoncheck[20]={0};
+	char portcheck[20]={0};
+	char datecheck[20]="2018/01/16";
+	char Maccheck[30]={0};
 
-	DUT_SendComman("eep i \"NovTech\"");
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
+	*test_result = PASS;
+
+	/*sprintf(verisoncheck, "%s%s", "Version: ", eepInfo.head);
+	sprintf(cmdBuff, "%s%s", "eep i ", eepInfo.head);
+	DUT_SendComman(cmdBuff);
+	delay_ms(50);
 
 	DUT_SendComman("eep c \"VeriFone\"");
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
+	delay_ms(50);
 
+	memset(cmdBuff, 0, 100);
 	sprintf(cmdBuff, "%s%s", "eep a ", eepInfo.board_name);
 	DUT_SendComman(cmdBuff);
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
+	delay_ms(50);
 
 	memset(cmdBuff, 0, 100);
 	sprintf(cmdBuff,"%s%s", "eep b ", eepInfo.board_version);
 	DUT_SendComman(cmdBuff);
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
+	delay_ms(100);
 
 	memset(cmdBuff, 0, 100);
 	sprintf(cmdBuff,"%s%s", "eep v ", eepInfo.software_version);
 	DUT_SendComman(cmdBuff);
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
+	delay_ms(50);
 
 	memset(cmdBuff, 0, 100);
-	sprintf(cmdBuff,"%s%s", "eep X ", eepInfo.MAC_address);
+	strcpy(Maccheck, eepInfo.MAC_address+2);
+	sprintf(cmdBuff,"%s%s", "eep ", eepInfo.MAC_address);
 	DUT_SendComman(cmdBuff);
-	//DUT_SendComman("eep X \"01:02:03:04:05:06\"");
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
+	delay_ms(50);
 
-	DUT_SendComman("eep p 1");
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
+	memset(cmdBuff, 0, 100);
+	datecheck[2]=eepInfo.date[0];
+	datecheck[3]=eepInfo.date[1];
+	datecheck[5]=eepInfo.date[2];
+	datecheck[6]=eepInfo.date[3];
+	datecheck[8]=eepInfo.date[4];
+	datecheck[9]=eepInfo.date[5];
+	sprintf(cmdBuff,"%s%s", "eep d ", eepInfo.date);
+	DUT_SendComman(cmdBuff);
+	delay_ms(50);
+
+	memset(cmdBuff, 0, 100);
+	sprintf(portcheck, "%s%s", "#: ", eepInfo.port);
+	sprintf(cmdBuff,"%s%s", "eep p ", eepInfo.port);
+	DUT_SendComman(cmdBuff);
+	delay_ms(50);
 
 	memset(cmdBuff, 0, 100);
 	sprintf(cmdBuff,"%s%s", "eep n ", eepInfo.serial_num);
 	DUT_SendComman(cmdBuff);
-	//DUT_SendComman("eep n \"1N72800008\"");
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
+	delay_ms(50);
 
 	DUT_SendComman("eep save");
-	UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1);
 
-	delay_ms(500);
+	delay_ms(100);
 
-	/*PowerCycle();
+	DUT_SendComman("reset");
+	if (UART_CheckStr(DUT_COMM_setting.fd, "autoboot:", 2)) {
+		 UART_SendFrame(DUT_COMM_setting.fd, "\r", strlen("\r"));
+		 GUI_SendMessage("at the U-Boot prompt \r\n");
+	}
+	else {
+		GUI_SendMessage("Failed\r\n");
+		*test_result = FAIL;
+		return;
+	}
+	delay_ms(10);
+	DUT_SendComman("eep u");
+	delay_ms(100);
+	DUT_GetCommandAck(AckBuff);
 
-	 if (UART_CheckStr(DUT_COMM_setting.fd, "atuoboot:", 3)) {
-		 UART_SendFrame(DUT_COMM_setting.fd, "\r\n", sizeof("\r\n"));
-		 *test_result = PASS;
-	 }
-
-	// DUT_SendComman("eep u");
-	 //delay_ms(500);
-
-	 //DUT_GetCommandAck(cmdBuff);*/
+	if (strstr(AckBuff, verisoncheck)==NULL) {
+		GUI_SendMessage("Version Failed\r\n");
+		*test_result = FAIL;
+	}
+	if (strstr(AckBuff, "VeriFone")==NULL) {
+		GUI_SendMessage("CM Failed\r\n");
+		*test_result = FAIL;
+	}
+	if (strstr(AckBuff, eepInfo.board_name)==NULL) {
+		GUI_SendMessage("Board name failed\r\n");
+		*test_result = FAIL;
+	}
+	if (strstr(AckBuff, eepInfo.board_version)==NULL) {
+		GUI_SendMessage("Board version failed\r\n");
+		*test_result = FAIL;
+	}
+	if (strstr(AckBuff, eepInfo.software_version)==NULL) {
+		GUI_SendMessage("Software version failed\r\n");
+		*test_result = FAIL;
+	}
+	if (strstr(AckBuff, Maccheck)==NULL) {
+		GUI_SendMessage("MAC address Failed\r\n");
+		*test_result = FAIL;
+	}
+	if (strstr(AckBuff, portcheck)==NULL) {
+		GUI_SendMessage("port Failed\r\n");
+		*test_result = FAIL;
+	}
+	if (strstr(AckBuff, eepInfo.serial_num)==NULL) {
+		GUI_SendMessage("Serial number failed\r\n");
+		*test_result = FAIL;
+	}
+	if (strstr(AckBuff, datecheck)==NULL) {
+		GUI_SendMessage("Date failed\r\n");
+		*test_result = FAIL;
+	}*/
+	*test_result = DONE;
 }
 int getDigitFromString(char *str, char *prefix, int *digit)
 {
@@ -763,6 +1045,7 @@ int getDigitFromString(char *str, char *prefix, int *digit)
 	}
 	return FALSE;
 }
+
 typedef struct {
 	char title[48];
 	char command[48];
@@ -773,34 +1056,59 @@ COMMAND_ITEM_T KL82Volt[] = {
 		"vin 0", "omnia2k82 vin 0", "VIN = ",
 		"vin 1", "omnia2k82 vin 1", "VIN = ",
 };
+
 void TestItem_KL82(U8 * test_result)
 {
-	char cmdBuff[256]={0};
+	int i;
+	char cmdBuff[DUT_ACK_BUFF_SIZE]={0};
 	int voltage=0;
 	int input_voltage=0;
 	int voltageMax=0;
 	int voltageMin=0;
 
+	*test_result=PASS;
 	GUI_SendMessage("Start to test KL82\r\n");
 
-	input_voltage=getVoltage(2);
+	input_voltage=getVoltage(RLY_24V_INPUT); //
 
 	voltageMax = input_voltage*105/100;
 	voltageMin = input_voltage*95/100;
+	DUT_SendComman("omnia2k82 vin 0");
+	DUT_SendComman("omnia2k82 vin 0");
+	delay_ms(100);
 
-	GUI_SendMessage("vin 0\r\n");
+	for (i=0; i<2; i++) {
+
+		GUI_SendMessage(KL82Volt[i].title);
+
+		DUT_SendComman(KL82Volt[i].command);
+		delay_ms(200);
+		DUT_GetCommandAck(cmdBuff);
+
+		if (!getDigitFromString(cmdBuff, "VIN = ", &voltage)) {
+				GUI_SendMessage("FAIL\r\n");
+		}
+		GUI_SendMessage("vin=%dmV\r\n",voltage);
+		if (voltage>voltageMin && voltage<voltageMax) {
+			GUI_SendMessage("PASS\r\n");
+		}
+		else {
+			*test_result=FAIL;
+			GUI_SendMessage("FAIL\r\n");
+		}
+		memset(cmdBuff, 0, DUT_ACK_BUFF_SIZE);
+	}
+
+	/*GUI_SendMessage("vin 0\r\n");
 	DUT_SendComman("omnia2k82 vin 0");
 	delay_ms(200);
 	DUT_GetCommandAck(cmdBuff);
 	if (!getDigitFromString(cmdBuff, "VIN = ", &voltage)) {
-		//*test_result = PASS;
 		GUI_SendMessage("FAIL\r\n");
-		//return;
 	}
 	GUI_SendMessage("vin=%dmV\r\n",voltage);
 
 	if (voltage>voltageMin && voltage<voltageMax) {
-		*test_result = PASS;
 		GUI_SendMessage("PASS\r\n");
 	}
 
@@ -811,36 +1119,79 @@ void TestItem_KL82(U8 * test_result)
 	if (!getDigitFromString(cmdBuff, "VIN = ", &voltage)) {
 			*test_result = PASS;
 			GUI_SendMessage("FAIL\r\n");
-			//return;
 	}
 	GUI_SendMessage("vin=%dmV\r\n",voltage);
 	if (voltage>voltageMin && voltage<voltageMax) {
 			*test_result = PASS;
 			GUI_SendMessage("PASS\r\n");
-	}
+	}*/
 }
 
-void TestItem_Contrlled(U8 * test_result)
+void TestItem_LED(U8 *test_result)
 {
-	int i;
-	int res;
+	U8 i;
+	U8 res;
+	int test_num=0;
 
-	GUI_SendMessage("Start to test regulaor\r\n");
-	DUT_SendComman("omnia_power");
-	delay_ms(100);
-	if(!UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1)) {
-		GUI_SendMessage("omnia_power err\r\n");
-	}
+	*test_result = PASS;
+	GUI_SendMessage("Start to test LED\r\n");
+	test_num = sizeof(LED_volt_item)/sizeof(VOLT_ITEM_T);
 
-	for (i=0; i<sizeof(cvolt_item)/sizeof(VOLT_ITEM_T); i++) {
-
-		res = TestVoltages((P_VOLT_ITEM_T)&cvolt_item[i]);
+	for (i=0; i<test_num; i++) {
+		res = TestVoltages((P_VOLT_ITEM_T)&LED_volt_item[i]);
 		if(res == PASS)
 			GUI_SendMessage("Passed\r\n");
 		else
 			GUI_SendMessage("Failed\r\n");
 
-		* test_result &= res;
+		*test_result &= res;
+	}
+	if (*test_result == FAIL) {
+		return;
+	}
+	*test_result=Test_LED();
+	if (*test_result == PASS) {
+		GUI_SendMessage("Passed\r\n");
+	}
+	else {
+		GUI_SendMessage("Failed\r\n");
+	}
+}
+
+void TestItem_Contrlled(U8 *test_result)
+{
+	int i;
+	int res;
+	*test_result = PASS;
+
+	GUI_SendMessage("Start to test regulator\r\n");
+
+	DUT_SendComman("omnia_power");
+
+	if (!UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1)) {
+		GUI_SendMessage("omnia_power err\r\n");
+	}
+
+	for (i=0; i<sizeof(cvolt_item)/sizeof(VOLT_ITEM_T); i++) {
+		res = TestVoltages((P_VOLT_ITEM_T)&cvolt_item[i]);
+		if (res == PASS) {
+			GUI_SendMessage("Passed\r\n");
+		}
+		else {
+			GUI_SendMessage("Failed\r\n");
+			*test_result = FAIL;
+		}
+	}
+
+	if (*test_result == FAIL) {
+		return;
+	}
+	*test_result=Test_RegulatorLED();
+	if (*test_result == PASS) {
+		GUI_SendMessage("PASS\r\n");
+	}
+	else {
+		GUI_SendMessage("Regulator LED failed\r\n");
 	}
 }
 
@@ -851,14 +1202,14 @@ void TestItem_CurrSrc(U8 * test_result)
     *test_result = PASS;
     GUI_SendMessage("Set to 35mA Current Source\r\n");
 
-    RLY_ON(72);
+    RLY_ON(RLY_PUMP_LOAD_SWITCH);
     delay_ms(100);
 
     DUT_SendComman("omnia_current1");
     if(!UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1)) {
     	GUI_SendMessage("omnia_current1 err\r\n");
     }
-	curr = TestCurrent(19, 20, 10);
+	curr = TestCurrent(RLY_PUMP2_VOLT, RLY_PUMP1_VOLT, 10);
 
 	if (curr >= CURR_SRC_35MIN && curr <= CURR_SRC_35MAX) {
 		GUI_SendMessage("Passed\r\n");
@@ -872,11 +1223,11 @@ void TestItem_CurrSrc(U8 * test_result)
 
     DUT_SendComman("omnia_current2");
     if(!UART_CheckStr(DUT_COMM_setting.fd, "OMNIA_MFG", 1)) {
-        	GUI_SendMessage("omnia_current1 err\r\n");
+        GUI_SendMessage("omnia_current1 err\r\n");
     }
-	curr = TestCurrent(19, 20, 10);
+    curr = TestCurrent(RLY_PUMP2_VOLT, RLY_PUMP1_VOLT, 10);
 
-	RLY_OFF(72);
+	RLY_OFF(RLY_PUMP_LOAD_SWITCH);
 
 	if (curr >= CURR_SRC_45MIN && curr <= CURR_SRC_45MAX) {
 		GUI_SendMessage("Passed\r\n");
@@ -887,68 +1238,127 @@ void TestItem_CurrSrc(U8 * test_result)
 	}
 }
 
+void TestItem_LCDDismount(U8 * test_result)
+{
+	char cmdBuff[DUT_ACK_BUFF_SIZE]={0};
+	*test_result = PASS;
+	GUI_SendMessage("Start to test LCD Dismount\r\n");
 
+	GUI_SendMessage("P1&P2 connect with a loopback\r\n");
+	RLY_ON(RLY_P1_LOOPBACK); //P1&P2 connect pin4 to GND.
+	RLY_ON(RLY_P2_LOOPBACK);
+	RLY_ON(RLY_BATTERY_SWITCH);
+	delay_ms(20);
+	DUT_SendComman("omnia_tamper clear");
+	DUT_SendComman("omnia_tamper clear");
+	DUT_SendComman("omnia_tamper");
+	delay_ms(100);
+	DUT_GetCommandAck(cmdBuff);
+
+	if (strstr(cmdBuff, "Tamper Side A: Clear")) {
+		GUI_SendMessage("Side A Clear\r\n");
+	}
+	else {
+		GUI_SendMessage("Side A fail\r\n");
+		*test_result = FAIL;
+		return;
+	}
+
+	if (strstr(cmdBuff, "Tamper Side B: Clear")) {
+			GUI_SendMessage("Side B Clear\r\n\r\n");
+	}
+	else {
+		GUI_SendMessage("Side B fail\r\n");
+		*test_result = FAIL;
+		return;
+	}
+
+	GUI_SendMessage("Power cycle, wait for 10 seconds\r\n");
+	PWR_TurnOffDut(); //power cycle
+	sleep(11);
+	tcflush(DUT_COMM_setting.fd, TCIFLUSH);
+	PWR_TurnOnDut();
+
+	if (UART_CheckStr(DUT_COMM_setting.fd, "autoboot:", 1)) {
+		 UART_SendFrame(DUT_COMM_setting.fd, "\r", sizeof("\r"));
+	}
+	memset(cmdBuff, 0, DUT_ACK_BUFF_SIZE);
+	DUT_SendComman("omnia_tamper");
+	DUT_SendComman("omnia_tamper");
+	delay_ms(100);
+	DUT_GetCommandAck(cmdBuff);
+
+	if (strstr(cmdBuff, "Tamper Side A: Clear")) {
+		GUI_SendMessage("Side A Clear\r\n");
+	}
+	else {
+		GUI_SendMessage("Side A fail\r\n");
+		*test_result = FAIL;
+		return;
+	}
+
+	if (strstr(cmdBuff, "Tamper Side B: Clear")) {
+		GUI_SendMessage("Side B Clear\r\n\r\n");
+	}
+	else {
+		GUI_SendMessage("Side B fail\r\n");
+		*test_result = FAIL;
+		return;
+	}
+
+	GUI_SendMessage("Remove the lookback\r\n");
+	RLY_OFF(RLY_P1_LOOPBACK); //
+	RLY_OFF(RLY_P2_LOOPBACK);
+	delay_ms(300);
+
+	memset(cmdBuff, 0, DUT_ACK_BUFF_SIZE);
+	DUT_SendComman("omnia_tamper");
+	delay_ms(100);
+	DUT_GetCommandAck(cmdBuff);
+
+	if (strstr(cmdBuff, "Tamper Side A: Set")) {
+		GUI_SendMessage("Side A Set\r\n");
+	}
+	else {
+		GUI_SendMessage("Side A fail\r\n");
+		*test_result = FAIL;
+		return;
+	}
+
+	if (strstr(cmdBuff, "Tamper Side B: Set")) {
+		GUI_SendMessage("Side B Set\r\n\r\n");
+	}
+	else {
+		GUI_SendMessage("Side B fail\r\n");
+		*test_result = FAIL;
+		return;
+	}
+}
+
+void TestItem_LCDVideo(U8 * test_result)
+{
+	RLY_ON(RLY_3V3_LCD);
+	*test_result = PASS;
+}
 
 void TestItem_Storage(U8 * test_result)
 {
-	int i=0;
-	char AckBuff[500]={0};
+
+	char AckBuff[DUT_ACK_BUFF_SIZE]={0};
 
 	*test_result = PASS;
 	GUI_SendMessage("Start to test storage\r\n");
 
-	for (i=0; i<2; i++) {
-
-		DUT_SendComman("omnia_storage");
-		delay_ms(500);
-		DUT_GetCommandAck(AckBuff);
-
-		if (strstr(AckBuff, "Reboot and re-run to check SRAM") != NULL) {
-			if (strstr(AckBuff, "SRAM STORE OK") != NULL) {
-				GUI_SendMessage("SRAM STORE PASS\r\n");
-
-				if (strstr(AckBuff, "SPI-NOR OK") != NULL) {
-					GUI_SendMessage("SPI NOR PASS\r\n");
-				}
-				else {
-					*test_result = FAIL;
-					GUI_SendMessage("SPI NOR FAIL\r\n");
-				}
-
-				if (strstr(AckBuff, "eMMC OK") != NULL) {
-						GUI_SendMessage("eMMC PASS\r\n");
-				}
-				else {
-					*test_result = FAIL;
-					GUI_SendMessage("eMMC FAIL\r\n");
-				}
-			}
-			else {
-				*test_result = FAIL;
-				GUI_SendMessage("SRAM STORE FAIL\r\n");
-			}
-		}
-		else {
-			if (strstr(AckBuff, "SRAM - PERSIST OK") != NULL) {
-				GUI_SendMessage("SRAM PERSIST PASS\r\n");
-			}
-			else {
-				*test_result = FAIL;
-				GUI_SendMessage("SRAM STORE FAIL\r\n");
-			}
-		}
-	}
-
-	/*DUT_SendComman("omnia_storage");
+	DUT_SendComman("omnia_storage");
 	delay_ms(500);
 	DUT_GetCommandAck(AckBuff);
-	if (strstr(AckBuff, "SPI-NOR OK") != NULL) {
+	/*if (strstr(AckBuff, "SPI-NOR OK") != NULL) {
 		GUI_SendMessage("SPI NOR PASS\r\n");
 	}
 	else {
 		*test_result = FAIL;
 		GUI_SendMessage("SPI NOR FAIL\r\n");
-	}
+	}*/
 
 	if (strstr(AckBuff, "eMMC OK") != NULL) {
 			GUI_SendMessage("eMMC PASS\r\n");
@@ -966,6 +1376,7 @@ void TestItem_Storage(U8 * test_result)
 		GUI_SendMessage("SRAM STORE FAIL\r\n");
 	}
 
+	memset(AckBuff, 0, DUT_ACK_BUFF_SIZE);
 	DUT_SendComman("omnia_storage");
 	delay_ms(500);
 	DUT_GetCommandAck(AckBuff);
@@ -976,7 +1387,7 @@ void TestItem_Storage(U8 * test_result)
 	else {
 		*test_result = FAIL;
 		GUI_SendMessage("SRAM STORE FAIL\r\n");
-	}*/
+	}
 }
 
 COMMAND_ITEM_T temp_sensor[] = {
@@ -994,6 +1405,7 @@ void TestItem_TemperatureSensor(U8 * test_result)
 	*test_result = PASS;
 	GUI_SendMessage("Start to test temperature sensor\r\n");
 	DUT_SendComman("omnia_temp");
+	DUT_SendComman("omnia_temp");
 	delay_ms(200);
 	DUT_GetCommandAck(AckBuff);
 
@@ -1003,7 +1415,7 @@ void TestItem_TemperatureSensor(U8 * test_result)
 		}
 
 		GUI_SendMessage("%s=%d C\r\n",temp_sensor[i].title,  dtt[i]);
-		if (dtt[i] > 20 && dtt[i]<30) {
+		if (dtt[i] >= 15 && dtt[i]<=35) {
 			GUI_SendMessage("PASS\r\n");
 		}
 		else {
@@ -1035,14 +1447,16 @@ void TestItem_Ethernet(U8 * test_result)
 
 	*test_result = PASS;
 	GUI_SendMessage("Start to test Ethernet\r\n");
-	for (i=0; i<8; i++) {
+	DUT_SendComman("setenv ipaddr 192.168.0.254");
+
+	for (i=1; i<8; i++) {
 		GUI_SendMessage("Start to test %s\r\n", Ethernet_Item[i].title);
 
 		RLY_ON(Ethernet_Item[i].channel);
 		delay_ms(100);
 
-		DUT_SendComman("ping 170.20.100.253");
-		if (UART_CheckStr(DUT_COMM_setting.fd, "alive", 3)) {
+		DUT_SendComman("ping 192.168.0.133");
+		if (UART_CheckStr(DUT_COMM_setting.fd, "host 192.168.0.133 is alive", 15)) {
 			GUI_SendMessage("%s test successful\r\n", Ethernet_Item[i].title);
 		}
 		else {
@@ -1057,11 +1471,12 @@ void TestItem_Ethernet(U8 * test_result)
 
 void TestItem_LinuxBoot(U8 * test_result)
 {
-
+	GUI_SendMessage("Start to linux boot\r\n");
 	DUT_SendComman("boot");
 
-	if (!UART_CheckStr(DUT_COMM_setting.fd, "omnia login:", 10)) {
-		*test_result = FAIL;
+	if (!UART_CheckStr(DUT_COMM_setting.fd, "Omnia login:", 12)) {
+		//*test_result = FAIL;
+		GUI_SendMessage("Can't check login\r\n");
 	}
 
 	DUT_SendComman("root");
@@ -1081,13 +1496,13 @@ void TestItem_LinuxBoot(U8 * test_result)
 	*test_result = PASS;
 }
 
-
-void TestItem_RTC(U8 * test_result)
+void TestItem_RTC(U8 *test_result)
 {
 	GUI_SendMessage("Start to test RTC\r\n");
 
+	RLY_ON(RLY_BATTERY_SWITCH);
 	DUT_SendComman("./rtc.sh");
-	if (!UART_CheckStr(DUT_COMM_setting.fd, "MMDDhhmm[[YY]YY][.ss]", 3)) {
+	if (!UART_CheckStr(DUT_COMM_setting.fd, "MMDDhhmm[[YY]YY][.ss]", 5)) {
 		GUI_SendMessage("Can't exec rtc.sh\r\n");
 		*test_result = FAIL;
 		return;
@@ -1099,15 +1514,16 @@ void TestItem_RTC(U8 * test_result)
 		*test_result = FAIL;
 		return;
 	}
-
+	RLY_OFF(RLY_BATTERY_SWITCH);
 	GUI_SendMessage("RTC test PASS\r\n");
 	*test_result = PASS;
 
 }
 
-void TestItem_USB(U8 * test_result)
+void TestItem_USB(U8 *test_result)
 {
 	GUI_SendMessage("Start to test USB\r\n");
+
 	DUT_SendComman("./usb.sh");
 	if (!UART_CheckStr(DUT_COMM_setting.fd, "press any key to continue", 10)) {
 		GUI_SendMessage("Can't exec usb.sh\r\n");
@@ -1127,43 +1543,93 @@ void TestItem_USB(U8 * test_result)
 
 void TestItem_Audio(U8 * test_result)
 {
+	int ret;
+	char cmd[10]={0};
+	*test_result = PASS;
 	GUI_SendMessage("Start to test Audio\r\n");
-	DUT_SendComman("./audio2.sh");
+	DUT_SendComman("./audio.sh");
 	if (!UART_CheckStr(DUT_COMM_setting.fd, "press return to continue", 1)) {
+
 		GUI_SendMessage("Can't exec audio2.sh\r\n");
 		*test_result = FAIL;
 		return;
 	}
 	DUT_SendComman("");
-	Audio_WhiteNoiseTest();
-	DUT_SendComman("");
-	Audio_WhiteNoiseTest();
-	DUT_SendComman("");
+	GUI_SendMessage("P6901 test\r\n");
+	RLY_ON(RLY_DUT_SPEAKKE_P6901_1);
+	RLY_ON(RLY_DUT_SPEAKKE_P6901_2);
+	delay_ms(100);
+	ret=Audio_Test_WhiteNoise(30, 70);
+	RLY_OFF(RLY_DUT_SPEAKKE_P6901_1);
+	RLY_OFF(RLY_DUT_SPEAKKE_P6901_2);
+	if (ret == PASS) {
+		GUI_SendMessage("PASS\r\n");
+	}
+	else {
+		*test_result = FAIL;
+		GUI_SendMessage("FAIL\r\n");
+	}
+	GUI_SendMessage("P6902 test\r\n");
+	RLY_ON(RLY_DUT_SPEAKKE_P6902_1);
+	RLY_ON(RLY_DUT_SPEAKKE_P6902_2);
+	delay_ms(100);
+	ret=Audio_Test_WhiteNoise(30, 70);
+	RLY_OFF(RLY_DUT_SPEAKKE_P6902_1);
+	RLY_OFF(RLY_DUT_SPEAKKE_P6902_2);
+	if (ret == PASS) {
+		GUI_SendMessage("PASS\r\n");
+	}
+	else {
+		*test_result = FAIL;
+		GUI_SendMessage("FAIL\r\n");
+	}
+	cmd[0]=0x03;//ctrl+c
+	DUT_SendComman(cmd);
+}
+
+BOOL TestActiveModeCurrectLoop(void)
+{
+	int i=0;
+	int res;
+	int ret=PASS;
+
+	GUI_SendMessage("Active mode\r\n");
+
+	DUT_SendComman("memtool 20A0000=7800FA0F");
+
+	for (i=0; i<sizeof(Activecurrloop_item)/sizeof(CURRLOOP_ITEM_T); i++) {
+		res = TestCurrLoopItem((P_CURRLOOP_ITEM_T)&Activecurrloop_item[i]);
+		ret &= res;
+    }
+	return ret;
+}
+
+BOOL TestPassiveModeCurrectLoop(void)
+{
+	int i=0;
+	int res;
+	int ret=PASS;
+
+	GUI_SendMessage("Passive mode\r\n");
+
+	DUT_SendComman("memtool 20A0000=7000FB0F");
+	//delay_ms(500);
+	for (i=0; i<sizeof(Passive_currloop_item)/sizeof(CURRLOOP_ITEM_T); i++) {
+		res = TestCurrLoopItem((P_CURRLOOP_ITEM_T)&Passive_currloop_item[i]);
+		ret &= res;
+	}
+	return ret;
 }
 
 void TestItem_CurrLoop(U8 * test_result)
 {
+    GUI_SendMessage("Start to test UART/current loop\r\n");
 
-    U8 i;
-    //U8 res;
-
-    //* test_result = PASS;
-   /* GUI_SendMessage("Start to test UART/current loop\r\n");
-	GUI_SendMessage("Set the i.MX6x Active mode\r\n");
-	DUT_SendComman("./memtool 20A0000=7800FA0F");
-
-    for(i=0; i<sizeof(currloop_item)/sizeof(CURRLOOP_ITEM_T); i++) {
-    	res = TestCurrLoopItem((P_CURRLOOP_ITEM_T)&currloop_item[i]);
-		if(res == PASS)
-			GUI_SendMessage("Passed\r\n");
-		else
-			GUI_SendMessage("Failed\r\n");
-
-		* test_result &= res;
-   }
-
-    GUI_SendMessage("Set the i.MX6x Passive mode\r\n");
-    DUT_SendComman("./memtool 20A0000=7800FB0F");*/
+    *test_result = TestActiveModeCurrectLoop();
+    if (*test_result == FAIL) {
+    	return;
+    }
+    *test_result = TestPassiveModeCurrectLoop();
 }
 
 
@@ -1174,6 +1640,11 @@ void TestItem_PowerOff(U8 * test_result)
     //LOGFILE_Write();
     Modules_Init();
     * test_result = DONE;
+}
+
+void TestItem_AutoPowerOff(U8 * test_result)
+{
+	* test_result = DONE;
 }
 
 char Assm[5];
@@ -1204,27 +1675,29 @@ typedef struct
 
 const TEST_ID TestIdTab[] =
 {
-	//{'A',  TestItem_Assembly},
-	//{'I',  TestItem_Impedance},
-	//{'N',  TestItem_PowerOn},
-	//{'V',  TestItem_Voltage},
-	//{'W',  TestItem_Reset},
-	//{'B',  TestItem_Battery},
-	//{'H',  TestItem_UBoot},
+	{'I',  TestItem_Impedance},
+	{'N',  TestItem_PowerOn},
+	{'V',  TestItem_Voltage},
+	{'W',  TestItem_Reset},
+	{'B',  TestItem_Battery},
+	{'H',  TestItem_UBoot},
 	{'P',  TestItem_Program},
-	//{'L',  TestItem_LED},
 	{'K',  TestItem_KL82},
 	{'O',  TestItem_Contrlled},
+	{'L',  TestItem_LED},
+	{'D',  TestItem_LCDDismount},
+	{'Q',  TestItem_LCDVideo},
 	{'T',  TestItem_CurrSrc},
 	{'S',  TestItem_Storage},
 	{'M',  TestItem_TemperatureSensor},
-	//{'E',  TestItem_Ethernet},
+	{'E',  TestItem_Ethernet},
 	{'X',  TestItem_LinuxBoot},
 	{'R',  TestItem_RTC},
 	{'U',  TestItem_USB},
 	{'A',  TestItem_Audio},
 	{'C',  TestItem_CurrLoop},
 	{'F',  TestItem_PowerOff},	// Phred
+	{'Y',  TestItem_AutoPowerOff},	// Phred
 };
 
 #define TEST_TIMES	20
@@ -1233,11 +1706,9 @@ void dbg(void)
 {
 	U8 i;
 	U8 test_result;
-	//int test_num=TestIdTab/sizeof(TEST_ID);
+	U8 id_sum = sizeof(TestIdTab)/sizeof(TEST_ID);
 
-	for (i=0;i<TEST_TIMES;i++) {
-		//TestItem_Program(&test_result);
-
+	for (i=0;i<id_sum;i++) {
 		(TestIdTab[i].TestFunc)(&test_result);     	// Testing.
 		ReportResult(test_result);
 		delay_ms(500);
@@ -1258,35 +1729,36 @@ void GUI_Process(void)
 
 	U8 id_sum = sizeof(TestIdTab)/sizeof(TEST_ID);
 
-	if(UART_GetLine(GUI_COMM_setting.fd, rbuf, (U8 * )&rcnt) == FALSE)
+	if (UART_GetLine(GUI_COMM_setting.fd, rbuf, (U8 *)&rcnt) == FALSE) {
 		return;
+	}
 
 	printf("Got GUI '%s'\n", rbuf);
 
-	/*for (i = 1; i <= rcnt; i++) {
-		is_upp = isupper(rbuf[rcnt-i]);
+	for (i = 0; i < rcnt; i++) {
+		is_upp = isupper(rbuf[i]);
 //    	printf("buff%d=%d,is %d\n", rcnt-i, rbuf[rcnt-i], is_upp);
 
-        if(is_upp) {
-            len = i;
+        if (is_upp) {
+            len = rcnt-i;
             break;
         }
-	}*/
+	}
 
-	len = rcnt;
-	if (len == 0 || len > GUI_CMD_FRAME_MAX) {//Buffer received error, it has been too long
+	if (len == 0 || len > GUI_CMD_FRAME_MAX) { //Buffer received error, it has been too long
 		printf("Command is error\n");
 		return;
 	}
-	strcpy(cmd,rbuf);
-	//memcpy(cmd, &rbuf[rcnt-i], len);
+	//strcpy(cmd,(rbuf+i));
+	memcpy(cmd, &rbuf[i], len);
 
-	for(i=0; i<id_sum; i++)
+	for (i=0; i<id_sum; i++)
 	{
-		if(TestIdTab[i].TestIdChar == cmd[0])    // Get the sum of testing ID from the TestIdTable.
+		if (TestIdTab[i].TestIdChar == cmd[0])    // Get the sum of testing ID from the TestIdTable.
 		{
-			if(cmd[0] == 'P')
-				parseProgrammingParameter(cmd);
+			if (cmd[0] == 'P') {
+				parseProgrammingParameter((char *)cmd);
+			}
 
 			(TestIdTab[i].TestFunc)(&test_result);     	// Testing.
 
