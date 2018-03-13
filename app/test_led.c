@@ -29,7 +29,7 @@ enum led_sensor_chan {
 
 int hueLimits[][2] = {
 	{0,   2},    //red
-	{100, 130},  //green
+	{90, 130},  //green
 	{220, 250},  //blue
 	{2,   10},   //amber
 	{60,  90},   //yellow
@@ -225,8 +225,8 @@ const LED_ITEM_T led_item[] = {
 	{"LED D28,",     1,   LED_COLOR_GREEN,  FALSE, LED_StartC4, LED_EndC4},
 	{"LED D37",      4,   LED_COLOR_YELLOW,  FALSE, LED_StartCE, LED_NullFunc},
 	{"LED D39",      5,   LED_COLOR_GREEN,  FALSE, LED_NullFunc,LED_EndCE},
-	{"LED D47",      6,   LED_COLOR_GREEN,  FALSE, LED_StartFE, LED_NullFunc},
-	{"LED D49,",     6,   LED_COLOR_GREEN,  FALSE, LED_NullFunc,LED_EndFE},
+	//{"LED D47",      6,   LED_COLOR_GREEN,  FALSE, LED_StartFE, LED_NullFunc},
+	{"LED D49,",     6,   LED_COLOR_GREEN,  FALSE, LED_StartFE,LED_EndFE},
 	{"LED D58,",     9,   LED_COLOR_YELLOW,  FALSE, LED_StartPM, LED_EndPM},
 	{"LED D53",      7,   LED_COLOR_YELLOW,  FALSE, LED_StartPE, LED_NullFunc},
 	{"LED D57,",     8,   LED_COLOR_GREEN,  FALSE, LED_NullFunc,LED_EndPE},

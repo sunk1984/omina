@@ -19,6 +19,9 @@ USART_CONFIG CCP_COMM_setting = {CCP_COMM_PORT, CHRL_8, US_NONE, STOP_1, 9600}; 
 #define IO_BOARD_MAX     	1
 #define IO_GROUP_PERBOARD  3
 
+#define IMPEDANCE_SAMPLE 20000
+#define VOLTAGE_SAMPLE   5000
+
 char pass_rpt[] = "\x10<PASS>\r\n";
 char fail_rpt[] = "\x10<FAIL>\r\n";
 char done_rpt[] = "\x10<DONE>\r\n";
@@ -162,34 +165,34 @@ const VOLT_ITEM_T cvolt_item[] = {
 };
 
 const VOLT_ITEM_T LED_volt_item[] = {
-	{"LED D7",  "", 30,  100,  18},
-	{"LED D8",  "", 30,  100,  21},
-	{"LED D17", "", 30,  100,  22},
-	{"LED D18", "", 30,  100,  23},
-	{"LED D19", "", 30,  100,  24},
-	{"LED D20", "", 30,  100,  40},
+	{"LED D7",  "", 30,  150,  18},
+	{"LED D8",  "", 30,  150,  21},
+	{"LED D17", "", 30,  150,  22},
+	{"LED D18", "", 30,  150,  23},
+	{"LED D19", "", 30,  150,  24},
+	{"LED D20", "", 30,  150,  40},
 };
 
 const VOLT_ITEM_T Impedance_item[] = {
 
 	{"24V Measurement",       "MTP22", 200, 2000,  2},
-	{"3.3V Measurement",      "MTP11", 200, 1000,  3},
-	{"5.0V_PS Measurement",   "MTP12", 200, 1000,  4},
-	{"VDDARM_IN Measurement", "MTP5",  200, 1000,  9},
-	{"VDDSOC_IN Measurement", "MTP8",  200, 1000,  11},
-	{"1.5V Measurement",      "MTP21", 200, 1000,  7},
-	{"1.1V Measurement",      "MTP9",  200, 1000,  8},
-	{"1.8V  Measurement",     "MTP7",  200, 1000,  5},
-	{"5.0V Measurement",      "MTP13", 200, 1000,  10},
-	{"1.35V Measurement",     "MTP6",  200, 1000,  6},
-	{"DDR_VTT Measurement",   "MTP27", 200, 1000,  12},
-	{"DDR_VREF Measurement",  "MTP26", 200, 1000,  13},
-	{"5.0V_USB Measurement",  "MTP14", 200, 1000,  14},
-	//{"7.5V Measurement",      "MTP10", 200, 1000,  15},
+	{"3.3V Measurement",      "MTP11", 200, 1500,  3},
+	{"5.0V_PS Measurement",   "MTP12", 200, 1500,  4},
+	{"VDDARM_IN Measurement", "MTP5",  200, 1500,  9},
+	{"VDDSOC_IN Measurement", "MTP8",  200, 1500,  11},
+	{"1.5V Measurement",      "MTP21", 200, 1500,  7},
+	{"1.1V Measurement",      "MTP9",  200, 1500,  8},
+	{"1.8V  Measurement",     "MTP7",  200, 1500,  5},
+	{"5.0V Measurement",      "MTP13", 200, 1500,  10},
+	{"1.35V Measurement",     "MTP6",  200, 1500,  6},
+	{"DDR_VTT Measurement",   "MTP27", 200, 1500,  12},
+	{"DDR_VREF Measurement",  "MTP26", 200, 1500,  13},
+	{"5.0V_USB Measurement",  "MTP14", 200, 1500,  14},
+	{"7.5V Measurement",      "MTP10", 200, 1000,  15},
 };
 
 VOLT_ITEM_T Reset_item = {"Reset switch",  "MTP3", 0,  200,  16};
-VOLT_ITEM_T Battery_item = {"Battery",  "MTP28", 3150,  3500,  17};
+VOLT_ITEM_T Battery_item = {"Battery",  "MTP28", 2950,  3500,  17};
 
 int getVoltage(int channle)
 {
@@ -212,6 +215,27 @@ static BOOL TestVoltages(P_VOLT_ITEM_T pitem)
 	GUI_SendMessage("%s\r\n%s:%2d.%03dV\r\n", pitem->title, pitem->tp_name, volt/1000, volt%1000);
 
 	if (volt >= pitem->lower && volt < pitem->upper)
+		return PASS;
+	else
+		return FAIL;
+}
+
+static BOOL TestImpedance(P_VOLT_ITEM_T pitem)
+{
+	U32 volt=0;
+	U32 Impedance=0;;
+
+	volt = getVoltage(pitem->channel);
+	if (volt == VOLTAGE_SAMPLE) {
+		Impedance = 10000000;
+	}
+	else {
+		Impedance = IMPEDANCE_SAMPLE*volt/(VOLTAGE_SAMPLE-volt);
+	}
+	//GUI_SendMessage("%s\r\n%s:%2d.%03dV\r\n", pitem->title, pitem->tp_name, volt/1000, volt%1000);
+	GUI_SendMessage("%s\r\n%s:%2d.%03dKO\r\n", pitem->title, pitem->tp_name, Impedance/1000, Impedance%1000);
+
+	if (Impedance >= pitem->lower && Impedance < pitem->upper)
 		return PASS;
 	else
 		return FAIL;
@@ -748,22 +772,26 @@ void TestItem_Impedance(U8 * test_result)
 	U8 i;
 	U8 res;
 	int test_num=0;
+	U8 Impedance_channel[]={26,27,28,33,35,31,32,29,34,30,36,37,38,25};
 
 	*test_result = PASS;
 	test_num = sizeof(Impedance_item)/sizeof(VOLT_ITEM_T);
 
 	for (i=0; i<test_num; i++) {
-		RLY_ON(24+Impedance_item[i].channel);
-		delay_ms(100);
-		res = TestVoltages((P_VOLT_ITEM_T)&Impedance_item[i]);
-		RLY_OFF(24+Impedance_item[i].channel);
+		//RLY_ON(24+Impedance_item[i].channel);
+		RLY_ON(Impedance_channel[i]);
+		delay_ms(500);
+		//res = TestVoltages((P_VOLT_ITEM_T)&Impedance_item[i]);
+		res = TestImpedance((P_VOLT_ITEM_T)&Impedance_item[i]);
+		//RLY_OFF(24+Impedance_item[i].channel);
+		RLY_OFF(Impedance_channel[i]);
 
-		if(res == PASS)
-			GUI_SendMessage("Passed\r\n");
-		else
-			GUI_SendMessage("Failed\r\n");
+		//if(res == PASS)
+		//	GUI_SendMessage("Passed\r\n");
+		//else
+		//	GUI_SendMessage("Failed\r\n");
 
-		* test_result &= res;
+		//* test_result &= res;
 	}
 }
 
@@ -775,7 +803,7 @@ void TestItem_PowerOn(U8 * test_result)
 	RLY_ON(RLY_DUT_DEBUG_TX);
 	RLY_ON(RLY_DUT_DEBUG_RX);
 	PWR_TurnOnDut();
-	delay_ms(1000);
+	delay_ms(2000);
 
     GUI_SendMessage("Test Current\r\n");
 
@@ -783,10 +811,9 @@ void TestItem_PowerOn(U8 * test_result)
 	if(curr >= CURR_TOT_MIN && curr <= CURR_TOT_MAX) {
 		* test_result = PASS;
 	}
-	else
+	else {
 		* test_result = FAIL;
-
-
+	}
 }
 
 void TestItem_Voltage(U8 * test_result)
@@ -879,7 +906,10 @@ void TestItem_UBoot(U8 * test_result)
 	BootConfig[1] &= 0xff;
 	BootConfig[2] &= 0x01;
 
-	if ((BootConfig[0]==0x40) && (BootConfig[1]==0x20) && (BootConfig[2]==0x00)) {
+	GUI_SendMessage("SOTP1-8:%x:\r\n",BootConfig[0]);
+	GUI_SendMessage("SOTP9-8:%x:\r\n",BootConfig[1]);
+	GUI_SendMessage("SOTP17:%x:\r\n",BootConfig[2]);
+	if ((BootConfig[0]==0x40) && ((BootConfig[1]==0x20)||(BootConfig[1]==0x40)) && (BootConfig[2]==0x00)) {
 		GUI_SendMessage("U-Boot Config passed\r\n");
 	}
 	else {
@@ -905,6 +935,7 @@ void TestItem_UBoot(U8 * test_result)
 
 void TestItem_Program(U8 *test_result)
 {
+	int i;
 	char cmdBuff[100]={0};
 	char AckBuff[1024]={0};
 	char verisoncheck[20]={0};
@@ -914,7 +945,7 @@ void TestItem_Program(U8 *test_result)
 
 	*test_result = PASS;
 
-	/*sprintf(verisoncheck, "%s%s", "Version: ", eepInfo.head);
+	sprintf(verisoncheck, "%s%s", "Version: ", eepInfo.head);
 	sprintf(cmdBuff, "%s%s", "eep i ", eepInfo.head);
 	DUT_SendComman(cmdBuff);
 	delay_ms(50);
@@ -939,6 +970,12 @@ void TestItem_Program(U8 *test_result)
 
 	memset(cmdBuff, 0, 100);
 	strcpy(Maccheck, eepInfo.MAC_address+2);
+	for (i=0; i<17; i++) {
+		if (Maccheck[i] >= 'A' && Maccheck[i] <= 'Z') {
+			Maccheck[i] = tolower(Maccheck[i]);
+		}
+
+	}
 	sprintf(cmdBuff,"%s%s", "eep ", eepInfo.MAC_address);
 	DUT_SendComman(cmdBuff);
 	delay_ms(50);
@@ -968,8 +1005,11 @@ void TestItem_Program(U8 *test_result)
 	DUT_SendComman("eep save");
 
 	delay_ms(100);
+	PWR_TurnOffDut();
+	sleep(10);
+	PWR_TurnOnDut();
+	//DUT_SendComman("reset");
 
-	DUT_SendComman("reset");
 	if (UART_CheckStr(DUT_COMM_setting.fd, "autoboot:", 2)) {
 		 UART_SendFrame(DUT_COMM_setting.fd, "\r", strlen("\r"));
 		 GUI_SendMessage("at the U-Boot prompt \r\n");
@@ -981,11 +1021,11 @@ void TestItem_Program(U8 *test_result)
 	}
 	delay_ms(10);
 	DUT_SendComman("eep u");
-	delay_ms(100);
+	delay_ms(50);
 	DUT_GetCommandAck(AckBuff);
 
 	if (strstr(AckBuff, verisoncheck)==NULL) {
-		GUI_SendMessage("Version Failed\r\n");
+		//GUI_SendMessage("Version Failed\r\n");
 		*test_result = FAIL;
 	}
 	if (strstr(AckBuff, "VeriFone")==NULL) {
@@ -993,17 +1033,17 @@ void TestItem_Program(U8 *test_result)
 		*test_result = FAIL;
 	}
 	if (strstr(AckBuff, eepInfo.board_name)==NULL) {
-		GUI_SendMessage("Board name failed\r\n");
+		//GUI_SendMessage("Board name failed\r\n");
 		*test_result = FAIL;
 	}
 	if (strstr(AckBuff, eepInfo.board_version)==NULL) {
-		GUI_SendMessage("Board version failed\r\n");
+		//GUI_SendMessage("Board version failed\r\n");
 		*test_result = FAIL;
 	}
-	if (strstr(AckBuff, eepInfo.software_version)==NULL) {
+	/*if (strstr(AckBuff, eepInfo.software_version)==NULL) {
 		GUI_SendMessage("Software version failed\r\n");
 		*test_result = FAIL;
-	}
+	}*/
 	if (strstr(AckBuff, Maccheck)==NULL) {
 		GUI_SendMessage("MAC address Failed\r\n");
 		*test_result = FAIL;
@@ -1019,7 +1059,7 @@ void TestItem_Program(U8 *test_result)
 	if (strstr(AckBuff, datecheck)==NULL) {
 		GUI_SendMessage("Date failed\r\n");
 		*test_result = FAIL;
-	}*/
+	}
 	*test_result = DONE;
 }
 int getDigitFromString(char *str, char *prefix, int *digit)
@@ -1248,7 +1288,7 @@ void TestItem_LCDDismount(U8 * test_result)
 	RLY_ON(RLY_P1_LOOPBACK); //P1&P2 connect pin4 to GND.
 	RLY_ON(RLY_P2_LOOPBACK);
 	RLY_ON(RLY_BATTERY_SWITCH);
-	delay_ms(20);
+	delay_ms(200);
 	DUT_SendComman("omnia_tamper clear");
 	DUT_SendComman("omnia_tamper clear");
 	DUT_SendComman("omnia_tamper");
@@ -1333,6 +1373,7 @@ void TestItem_LCDDismount(U8 * test_result)
 		*test_result = FAIL;
 		return;
 	}
+	RLY_OFF(RLY_BATTERY_SWITCH);
 }
 
 void TestItem_LCDVideo(U8 * test_result)
@@ -1352,13 +1393,13 @@ void TestItem_Storage(U8 * test_result)
 	DUT_SendComman("omnia_storage");
 	delay_ms(500);
 	DUT_GetCommandAck(AckBuff);
-	/*if (strstr(AckBuff, "SPI-NOR OK") != NULL) {
+	if (strstr(AckBuff, "SPI-NOR OK") != NULL) {
 		GUI_SendMessage("SPI NOR PASS\r\n");
 	}
 	else {
 		*test_result = FAIL;
 		GUI_SendMessage("SPI NOR FAIL\r\n");
-	}*/
+	}
 
 	if (strstr(AckBuff, "eMMC OK") != NULL) {
 			GUI_SendMessage("eMMC PASS\r\n");
@@ -1415,7 +1456,7 @@ void TestItem_TemperatureSensor(U8 * test_result)
 		}
 
 		GUI_SendMessage("%s=%d C\r\n",temp_sensor[i].title,  dtt[i]);
-		if (dtt[i] >= 15 && dtt[i]<=35) {
+		if (dtt[i] >= 20 && dtt[i]<=38) {
 			GUI_SendMessage("PASS\r\n");
 		}
 		else {
@@ -1501,6 +1542,7 @@ void TestItem_RTC(U8 *test_result)
 	GUI_SendMessage("Start to test RTC\r\n");
 
 	RLY_ON(RLY_BATTERY_SWITCH);
+	delay_ms(200);
 	DUT_SendComman("./rtc.sh");
 	if (!UART_CheckStr(DUT_COMM_setting.fd, "MMDDhhmm[[YY]YY][.ss]", 5)) {
 		GUI_SendMessage("Can't exec rtc.sh\r\n");
