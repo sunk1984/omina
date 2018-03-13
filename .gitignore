@@ -1,0 +1,4 @@
+#ignore .o files
+*.[o]
+#ignore all files in the Debug/ directory
+Debug/
