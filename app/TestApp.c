@@ -148,29 +148,29 @@ const VOLT_ITEM_T volt_item[] = {
 	{"24V Measurement",       "MTP22", 22000, 26000, 2},
 	{"3.3V Measurement",      "MTP11", 3250,  3350,  3},
 	{"5.0V_PS Measurement",   "MTP12", 4750,  5250,  4},
-	{"VDDARM_IN Measurement", "MTP5",  1227,  1270,  9},
+	{"VDDARM_IN Measurement", "MTP5",  1227,  1281,  9},
 	{"VDDSOC_IN Measurement", "MTP8",  1227,  1270,  11},
-	{"1.5V Measurement",      "MTP21", 1470,  1530,  7},
-	{"1.1V Measurement",      "MTP9",  1070,  1130,  8},
-	{"1.8V  Measurement",     "MTP7",  1770,  1830,  5},
+	{"1.5V Measurement",      "MTP21", 1440,  1700,  7},
+	{"1.1V Measurement",      "MTP9",  1050,  1130,  8},
+	{"1.8V  Measurement",     "MTP7",  1730,  1830,  5},
 	{"5.0V Measurement",      "MTP13", 4750,  5250,  10},
-	{"1.35V Measurement",     "MTP6",  1330,  1370,  6},
-	{"DDR_VTT Measurement",   "MTP27", 660,   685,   12},
-	{"DDR_VREF Measurement",  "MTP26", 665,   685,   13},
+	{"1.35V Measurement",     "MTP6",  1300,  1370,  6},
+	{"DDR_VTT Measurement",   "MTP27", 650,   685,   12},
+	{"DDR_VREF Measurement",  "MTP26", 662,   685,   13},
 };
 
 const VOLT_ITEM_T cvolt_item[] = {
 	{"5.0V_USB Measurement",  "MTP14", 4750,  5250,  14},
-	{"7.5V Measurement",      "MTP10", 7250,  7750,  15}
+	{"7.5V Measurement",      "MTP10", 7250,  7763,  15}
 };
 
 const VOLT_ITEM_T LED_volt_item[] = {
-	{"LED D7",  "", 30,  150,  18},
-	{"LED D8",  "", 30,  150,  21},
-	{"LED D17", "", 30,  150,  22},
-	{"LED D18", "", 30,  150,  23},
-	{"LED D19", "", 30,  150,  24},
-	{"LED D20", "", 30,  150,  40},
+	{"LED D7",  "", 30,  300,  18},
+	{"LED D8",  "", 30,  300,  21},
+	{"LED D17", "", 30,  300,  22},
+	{"LED D18", "", 30,  300,  23},
+	{"LED D19", "", 30,  300,  24},
+	{"LED D20", "", 30,  300,  40},
 };
 
 const VOLT_ITEM_T Impedance_item[] = {
@@ -223,7 +223,7 @@ static BOOL TestVoltages(P_VOLT_ITEM_T pitem)
 static BOOL TestImpedance(P_VOLT_ITEM_T pitem)
 {
 	U32 volt=0;
-	U32 Impedance=0;;
+	U32 Impedance=0;
 
 	volt = getVoltage(pitem->channel);
 	if (volt == VOLTAGE_SAMPLE) {
@@ -906,9 +906,9 @@ void TestItem_UBoot(U8 * test_result)
 	BootConfig[1] &= 0xff;
 	BootConfig[2] &= 0x01;
 
-	GUI_SendMessage("SOTP1-8:%x:\r\n",BootConfig[0]);
-	GUI_SendMessage("SOTP9-8:%x:\r\n",BootConfig[1]);
-	GUI_SendMessage("SOTP17:%x:\r\n",BootConfig[2]);
+	GUI_SendMessage("SOTP1-8:%x:\r\n", BootConfig[0]);
+	GUI_SendMessage("SOTP9-16:%x:\r\n",BootConfig[1]);
+	GUI_SendMessage("SOTP17:%x:\r\n",  BootConfig[2]);
 	if ((BootConfig[0]==0x40) && ((BootConfig[1]==0x20)||(BootConfig[1]==0x40)) && (BootConfig[2]==0x00)) {
 		GUI_SendMessage("U-Boot Config passed\r\n");
 	}

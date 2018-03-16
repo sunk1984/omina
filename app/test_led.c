@@ -32,7 +32,7 @@ int hueLimits[][2] = {
 	{90, 130},  //green
 	{220, 250},  //blue
 	{2,   10},   //amber
-	{60,  90},   //yellow
+	{50,  90},   //yellow
 	{10,  20},   //orange
 };
 
